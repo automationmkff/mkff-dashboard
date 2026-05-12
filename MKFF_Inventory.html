@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>MKFF Laser — Inventory Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#111;--bg2:#1a1a1a;--bg3:#222;--bg4:#2a2a2a;--border:#2e2e2e;--text:#e8e8e8;--muted:#888;--faint:#555}
+body.light{--bg:#f5f5f4;--bg2:#ffffff;--bg3:#f0f0ef;--bg4:#e8e8e7;--border:#e0e0e0;--text:#1a1a1a;--muted:#777;--faint:#aaa}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:13px;background:var(--bg);color:var(--text);min-height:100vh;transition:background 0.2s,color 0.2s}
+
+a,button,select,input{font-family:inherit}
+select,input{font-size:12px;color:var(--text);background:var(--bg3);border:0.5px solid var(--border);border-radius:6px;padding:5px 10px;outline:none}
+select:focus,input:focus{border-color:#555}
+button{font-size:12px;cursor:pointer;border:0.5px solid var(--border);border-radius:6px;background:transparent;color:var(--text);padding:5px 12px}
+button:hover{background:var(--bg3)}
+.app{display:grid;grid-template-rows:auto auto 1fr;height:100vh}
+
+/* Header */
+.header{background:var(--bg2);border-bottom:0.5px solid var(--border);padding:12px 20px;display:flex;justify-content:space-between;align-items:center}
+.header-left{display:flex;align-items:center;gap:12px}
+.logo{font-size:14px;font-weight:500}
+.fx-badge{background:var(--bg4);color:#7dd3a0;font-size:11px;padding:3px 10px;border-radius:20px}
+.updated{font-size:11px;color:var(--muted)}
+
+/* Metric cards */
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border-bottom:0.5px solid var(--border)}
+.met{background:var(--bg2);padding:14px 20px;border-left:3px solid transparent}
+.met.m-green{border-left-color:#5DCAA5}
+.met.m-red{border-left-color:#E24B4A}
+.met.m-amber{border-left-color:#EF9F27}
+.met.m-blue{border-left-color:#378ADD}
+.met-lbl{font-size:11px;color:var(--muted);margin-bottom:6px}
+.met-val{font-size:24px;font-weight:500;line-height:1.1}
+.met-sub{font-size:11px;color:var(--faint);margin-top:4px}
+
+/* Body layout */
+.body{display:grid;grid-template-columns:210px 1fr;overflow:hidden}
+
+/* Sidebar */
+.sidebar{background:var(--bg2);border-right:0.5px solid var(--border);padding:16px 8px;overflow-y:auto}
+.sb-section{margin-bottom:20px}
+.sb-label{font-size:10px;font-weight:500;color:var(--faint);padding:0 8px;margin-bottom:6px;letter-spacing:0.8px;text-transform:uppercase}
+.sb-item{display:flex;align-items:center;justify-content:space-between;padding:7px 8px;border-radius:6px;cursor:pointer;color:var(--muted);margin-bottom:2px;transition:background 0.1s}
+.sb-item:hover{background:var(--bg3);color:var(--text)}
+.sb-item.active{background:var(--bg3);color:var(--text);font-weight:500}
+.sb-left{display:flex;align-items:center;gap:8px;font-size:12px}
+.sb-icon{font-size:14px;width:16px;text-align:center}
+.badge{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500}
+.b-red{background:#3a1515;color:#F09595}
+.b-amber{background:#2e1e08;color:#FAC775}
+.b-grey{background:var(--bg4);color:var(--muted)}
+body.light .b-red{background:#FCEBEB;color:#A32D2D}
+body.light .b-amber{background:#FAEEDA;color:#633806}
+body.light .t-red{background:#FCEBEB;color:#A32D2D}
+body.light .t-amber{background:#FAEEDA;color:#633806}
+body.light .t-yellow{background:#FEFBE7;color:#7A6205}
+body.light .t-green{background:#EAF3DE;color:#27500A}
+body.light .t-grey{background:#f0f0f0;color:#666}
+body.light .t-purple{background:#EEEDFE;color:#3C3489}
+body.light .stopped-row td{background:#FEFAF0}
+.theme-toggle{background:var(--bg4);border:0.5px solid var(--border);border-radius:20px;padding:4px 12px;font-size:11px;cursor:pointer;color:var(--text);display:flex;align-items:center;gap:6px}
+.theme-toggle:hover{background:var(--bg3)}
+.sb-div{height:0.5px;background:var(--border);margin:8px 4px 12px}
+
+/* Main content */
+.main{overflow-y:auto;padding:16px 20px;background:var(--bg)}
+.main-title{font-size:14px;font-weight:500;margin-bottom:4px}
+.main-sub{font-size:11px;color:var(--muted);margin-bottom:16px}
+
+/* Charts row */
+.charts-row{display:grid;grid-template-columns:1fr 280px;gap:12px;margin-bottom:14px}
+.card{background:var(--bg2);border:0.5px solid var(--border);border-radius:10px;padding:14px}
+.card-title{font-size:12px;font-weight:500;color:var(--muted);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+.card-title span{font-size:10px;color:var(--faint)}
+
+/* Health bars */
+.health-item{display:grid;grid-template-columns:90px 1fr 80px;gap:8px;align-items:center;margin-bottom:8px}
+.health-item:last-child{margin-bottom:0}
+.h-name{font-size:12px;font-weight:500}
+.h-bar{height:10px;border-radius:5px;overflow:hidden;display:flex}
+.h-seg{height:100%}
+.h-counts{font-size:10px;color:var(--muted);text-align:right}
+
+/* Legend */
+.legend{display:flex;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+.leg{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--muted)}
+.leg-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+
+/* Donut value labels */
+.val-row{display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px}
+.val-row:last-child{margin-bottom:0}
+.val-name{display:flex;align-items:center;gap:6px;color:var(--muted)}
+.val-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.val-amt{color:var(--text);font-weight:500}
+
+/* Table section */
+.table-section{background:var(--bg2);border:0.5px solid var(--border);border-radius:10px;overflow:hidden}
+.table-hdr{padding:12px 16px;border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.table-title{font-size:12px;font-weight:500}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.tov{overflow-x:auto;max-height:400px;overflow-y:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{font-size:10px;font-weight:500;color:var(--muted);text-align:left;padding:8px 14px;border-bottom:0.5px solid var(--border);background:var(--bg3);white-space:nowrap;position:sticky;top:0;z-index:1}
+td{padding:7px 14px;border-bottom:0.5px solid var(--border);color:var(--text);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--bg3)}
+.tag{display:inline-block;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500;white-space:nowrap}
+.t-red{background:#3a1515;color:#F09595}
+.t-amber{background:#2e1e08;color:#FAC775}
+.t-yellow{background:#2a2000;color:#EFC15A}
+.t-green{background:#0f2010;color:#5DCAA5}
+.t-grey{background:var(--bg4);color:var(--muted)}
+.t-purple{background:#1e1840;color:#AFA9EC}
+.days-wrap{display:flex;align-items:center;gap:6px}
+.d-bar{width:50px;height:4px;border-radius:2px;background:var(--bg4)}
+.d-fill{height:4px;border-radius:2px}
+.stopped-row td{background:#1e1800}
+.pager{padding:10px 16px;font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:center;border-top:0.5px solid var(--border)}
+
+/* Alert strip */
+.alert-strip{background:var(--bg2);border-bottom:0.5px solid var(--border);padding:8px 20px;display:flex;align-items:center;gap:10px;overflow:hidden}
+.strip-label{font-size:11px;font-weight:500;white-space:nowrap;color:var(--muted);flex-shrink:0}
+.strip-scroll{display:flex;gap:6px;overflow-x:auto;flex:1;padding-bottom:2px}
+.strip-scroll::-webkit-scrollbar{height:3px}
+.strip-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.alert-pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;white-space:nowrap;cursor:pointer;flex-shrink:0;border:0.5px solid transparent;transition:opacity 0.1s}
+.alert-pill:hover{opacity:0.8}
+.pill-red{background:#3a1515;color:#F09595;border-color:#5a2020}
+.pill-amber{background:#2e1e08;color:#FAC775;border-color:#4a3010}
+body.light .pill-red{background:#FCEBEB;color:#A32D2D;border-color:#F7C1C1}
+body.light .pill-amber{background:#FAEEDA;color:#633806;border-color:#FAC775}
+.pill-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.pd-red{background:#E24B4A}
+.pd-amber{background:#EF9F27}
+
+/* Urgency chart */
+.urgency-card{background:var(--bg2);border:0.5px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px}
+.urg-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px}
+.urg-title{font-size:12px;font-weight:500;color:var(--muted)}
+.cat-btns{display:flex;gap:4px;flex-wrap:wrap}
+.cat-btn{font-size:11px;padding:3px 10px;border-radius:20px;border:0.5px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all 0.1s}
+.cat-btn:hover{border-color:var(--faint);color:var(--text)}
+.cat-btn.active{background:var(--bg4);color:var(--text);border-color:var(--faint);font-weight:500}
+.urgency-row{display:grid;grid-template-columns:190px 1fr 55px;gap:8px;align-items:center;margin-bottom:7px}
+.urgency-row:last-child{margin-bottom:0}
+.u-name{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
+.u-bar-bg{height:8px;border-radius:4px;background:var(--bg4);overflow:hidden}
+.u-bar-fill{height:8px;border-radius:4px;transition:width 0.3s}
+.u-days{font-size:11px;font-weight:500;text-align:right;white-space:nowrap}
+
+/* Anomaly banner */
+.anomaly-banner{display:flex;align-items:center;gap:10px;background:#2e1e08;border:0.5px solid #4a3010;border-radius:var(--border-radius-md);padding:10px 14px;font-size:12px;color:#FAC775;margin-bottom:14px}
+body.light .anomaly-banner{background:#FAEEDA;border-color:#FAC775;color:#633806}
+.anomaly-text{flex:1}
+.anomaly-dismiss{font-size:11px;padding:3px 8px;border:0.5px solid currentColor;border-radius:4px;background:transparent;color:inherit;cursor:pointer;white-space:nowrap;opacity:0.8}
+.anomaly-dismiss:hover{opacity:1}
+</style>
+</head>
+<body class="light">
+<div class="app">
+
+<!-- Header -->
+<div class="header">
+  <div class="header-left">
+    <span class="logo">MKFF Laser — Inventory</span>
+    <span id="fx-badge" class="fx-badge">Fetching rate...</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <span id="updated" class="updated"></span>
+    <button class="theme-toggle" id="theme-btn" onclick="toggleTheme()">☾ Dark mode</button>
+  </div>
+</div>
+
+<!-- Metric cards -->
+<div class="metrics">
+  <div class="met m-green">
+    <div class="met-lbl">Total inventory value</div>
+    <div class="met-val" id="m-value">฿—</div>
+    <div class="met-sub"><span id="m-priced">128</span> priced · <span id="m-missing" style="color:#FAC775">183 missing price</span></div>
+  </div>
+  <div class="met m-red">
+    <div class="met-lbl">Critical / zero stock</div>
+    <div class="met-val" style="color:#F09595">108</div>
+    <div class="met-sub">items need immediate action</div>
+  </div>
+  <div class="met m-amber">
+    <div class="met-lbl">Stopped moving (60d)</div>
+    <div class="met-val" style="color:#FAC775">103</div>
+    <div class="met-sub">items with stock, no withdrawals</div>
+  </div>
+  <div class="met m-blue">
+    <div class="met-lbl">Active alerts</div>
+    <div class="met-val">57</div>
+    <div class="met-sub">across all categories</div>
+  </div>
+</div>
+
+<!-- Body -->
+<div class="body">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sb-section">
+      <div class="sb-label">Overview</div>
+      <div class="sb-item active" data-view="all" onclick="switchView(this)">
+        <div class="sb-left"><span class="sb-icon">⊞</span>All categories</div>
+        <span class="badge b-red">108</span>
+      </div>
+      <div class="sb-item" data-view="alerts" onclick="switchView(this)">
+        <div class="sb-left"><span class="sb-icon">🔔</span>Active alerts</div>
+        <span class="badge b-amber">57</span>
+      </div>
+    </div>
+    <div class="sb-div"></div>
+    <div class="sb-section">
+      <div class="sb-label">Categories</div>
+      <div class="sb-item" data-view="Metal Foils" onclick="switchView(this)">
+        <div class="sb-left"><span class="sb-icon">▦</span>Metal Foils</div>
+        <span class="badge b-red">34</span>
+      </div>
+      <div class="sb-item" data-view="Frames" onclick="switchView(this)">
+        <div class="sb-left"><span class="sb-icon">⬜</span>Frames</div>
+        <span class="badge b-amber">6</span>
+      </div>
+      <div class="sb-item" data-view="Wiper Rolls" onclick="switchView(this)">
+        <div class="sb-left"><span class="sb-icon">⊙</span>Wiper Rolls</div>
+        <span class="badge b-red">37</span>
+      </div>
+      <div class="sb-item" data-view="Consumables" onclick="switchView(this)">
+        <div class="sb-left"><span class="sb-icon">📦</span>Consumables</div>
+        <span class="badge b-grey">20</span>
+      </div>
+    </div>
+    <div class="sb-div"></div>
+    <div class="sb-section">
+      <div class="sb-label">Flags</div>
+      <div class="sb-item" data-view="stopped" onclick="switchView(this)">
+        <div class="sb-left"><span class="sb-icon">⏸</span>Stopped moving</div>
+        <span class="badge b-amber">103</span>
+      </div>
+      <div class="sb-item" data-view="noprice" onclick="switchView(this)">
+        <div class="sb-left"><span class="sb-icon">✕</span>Missing price</div>
+        <span class="badge b-grey">183</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main" id="main-content">
+
+    <!-- All categories view -->
+    <div id="view-all">
+      <div class="main-title">All categories — overview</div>
+      <div class="main-sub" id="all-sub">311 items · updated —</div>
+
+      <!-- Anomaly banner -->
+      <div class="anomaly-banner" id="anomaly-banner" style="display:none">
+        <span>⚠️</span>
+        <span class="anomaly-text" id="anomaly-text"></span>
+        <button class="anomaly-dismiss" onclick="document.getElementById('anomaly-banner').style.display='none'">Dismiss</button>
+      </div>
+
+      <div class="charts-row">
+        <div class="card">
+          <div class="card-title">
+            Stock health by category
+            <span>critical · low · caution · ok · no data</span>
+          </div>
+          <div class="legend">
+            <span class="leg"><span class="leg-dot" style="background:#E24B4A"></span>Critical/Zero</span>
+            <span class="leg"><span class="leg-dot" style="background:#EF9F27"></span>Low (&lt;30d)</span>
+            <span class="leg"><span class="leg-dot" style="background:#EFC15A"></span>Caution (&lt;60d)</span>
+            <span class="leg"><span class="leg-dot" style="background:#5DCAA5"></span>OK</span>
+            <span class="leg"><span class="leg-dot" style="background:#3a3a3a"></span>No data</span>
+          </div>
+          <div id="health-bars"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Inventory value by category</div>
+          <div style="position:relative;height:130px;margin-bottom:10px">
+            <canvas id="val-chart" role="img" aria-label="Donut chart showing inventory value by category">Metal Foils ฿997k, Frames ฿538k, Wiper Rolls ฿157k, Consumables ฿1,883k</canvas>
+          </div>
+          <div id="val-legend"></div>
+        </div>
+      </div>
+
+      <!-- Urgency chart -->
+      <div class="urgency-card">
+        <div class="urg-header">
+          <span class="urg-title">Top 10 most urgent items — days of stock remaining</span>
+          <div class="cat-btns" id="urg-btns">
+            <button class="cat-btn active" data-cat="" onclick="setUrgCat(this)">All</button>
+            <button class="cat-btn" data-cat="Metal Foils" onclick="setUrgCat(this)">Metal Foils</button>
+            <button class="cat-btn" data-cat="Frames" onclick="setUrgCat(this)">Frames</button>
+            <button class="cat-btn" data-cat="Wiper Rolls" onclick="setUrgCat(this)">Wiper Rolls</button>
+            <button class="cat-btn" data-cat="Consumables" onclick="setUrgCat(this)">Consumables</button>
+          </div>
+        </div>
+        <div id="urgency-rows"></div>
+      </div>
+
+      <div class="table-section">
+        <div class="table-hdr">
+          <span class="table-title" id="tbl-title">All items — sorted by urgency</span>
+          <div class="controls">
+            <input type="text" id="search" placeholder="Search item..." style="width:160px">
+            <select id="filter-cat">
+              <option value="">All categories</option>
+              <option value="Metal Foils">Metal Foils</option>
+              <option value="Frames">Frames</option>
+              <option value="Wiper Rolls">Wiper Rolls</option>
+              <option value="Consumables">Consumables</option>
+            </select>
+            <select id="filter-status">
+              <option value="">All statuses</option>
+              <option value="critical">Critical (&lt;14d)</option>
+              <option value="low">Low (14-30d)</option>
+              <option value="caution">Caution (30-60d)</option>
+              <option value="ok">OK (&gt;60d)</option>
+              <option value="stopped">Stopped moving</option>
+              <option value="noprice">Missing price</option>
+            </select>
+            <select id="filter-supplier">
+              <option value="">All suppliers</option>
+            </select>
+          </div>
+        </div>
+        <div class="tov">
+          <table>
+            <thead><tr>
+              <th>Item</th><th>Category</th><th>Stock</th>
+              <th>Days remaining</th><th>90d avg</th>
+              <th>Price (USD)</th><th>Value (THB)</th>
+              <th>Supplier</th><th>Flags</th>
+            </tr></thead>
+            <tbody id="tbl-body"></tbody>
+          </table>
+        </div>
+        <div class="pager" id="pager"></div>
+      </div>
+    </div>
+
+    <!-- Alerts view -->
+    <div id="view-alerts" style="display:none">
+      <div class="main-title">Active alerts</div>
+      <div class="main-sub">57 active alerts across all categories</div>
+      <div class="table-section">
+        <div class="tov">
+          <table>
+            <thead><tr><th>Item</th><th>Category</th><th>Alert type</th><th>Last alerted</th><th>Snoozed until</th></tr></thead>
+            <tbody id="alert-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<script>
+const INV={"items":[{"n":"FGM301L-0.150x610x500mm","c":"Metal Foils","s":0.0,"p":6.21,"a90":20.0,"dr":0,"ds":"zero","sup":"NIPPON GOKIN SDN BHD","st":"Re-purchase needed","stop":false,"lw":"2026-04-22"},{"n":"FGM301L-0.090x610x700mm","c":"Metal Foils","s":0.0,"p":9.2,"a90":25.0,"dr":0,"ds":"zero","sup":"NIPPON GOKIN SDN BHD","st":"","stop":false,"lw":"2026-04-24"},{"n":"SUS304H-SR2-0.120x610x700mm","c":"Metal Foils","s":0.0,"p":7.8,"a90":80.0,"dr":0,"ds":"zero","sup":"NIPPON GOKIN SDN BHD","st":"Re-purchase needed","stop":false,"lw":"2026-04-27"},{"n":"MAGNET-0.500x610x700mm","c":"Metal Foils","s":0.0,"p":31.5,"a90":68.0,"dr":0,"ds":"zero","sup":"NIPPON GOKIN SDN BHD","st":"","stop":false,"lw":"2026-04-30"},{"n":"NICKEL-0.100x550x610mm","c":"Metal Foils","s":0.0,"p":90.0,"a90":1.0,"dr":0,"ds":"zero","sup":"NIPPON GOKIN SDN BHD","st":"","stop":false,"lw":"2026-04-06"},{"n":"FGNL-SUS304H-TA-0.050x610x700mm","c":"Metal Foils","s":0.0,"p":12.05,"a90":33.0,"dr":0,"ds":"zero","sup":"NIPPON GOKIN SDN BHD","st":"Re-purchase needed","stop":false,"lw":"2026-05-07"},{"n":"MAGNET-0.060x600x800mm","c":"Metal Foils","s":0.0,"p":8.1,"a90":615.0,"dr":0,"ds":"zero","sup":"NIPPON GOKIN SDN BHD","st":"Re-purchase needed","stop":false,"lw":"2026-05-04"},{"n":"FGM301L-0.150x610x700mm","c":"Metal Foils","s":0.0,"p":10.15,"a90":290.0,"dr":0,"ds":"zero","sup":"NIPPON GOKIN SDN BHD","st":"Temporarily unavailable","stop":false,"lw":"2026-05-06"},{"n":"SUS304H-SR2-0.100x610x700mm","c":"Metal Foils","s":20.0,"p":7.65,"a90":135.0,"dr":13,"ds":"critical","sup":"NIPPON GOKIN SDN BHD","st":"","stop":false,"lw":"2026-04-23"},{"n":"MAGNET-0.200x610x800mm","c":"Metal Foils","s":25.0,"p":14.1,"a90":255.0,"dr":9,"ds":"critical","sup":"NIPPON GOKIN SDN BHD","st":"","stop":false,"lw":"2026-04-29"},{"n":"FGM301L-0.100x610x700mm","c":"Metal Foils","s":75.0,"p":7.7,"a90":475.0,"dr":14,"ds":"low","sup":"NIPPON GOKIN SDN BHD","st":"Re-purchase needed","stop":false,"lw":"2026-05-07"},{"n":"FGM301L-0.130x610x700mm","c":"Metal Foils","s":80.0,"p":8.86,"a90":435.0,"dr":17,"ds":"low","sup":"NIPPON GOKIN SDN BHD","st":"","stop":false,"lw":"2026-05-07"},{"n":"FGM301L-0.200x610x700mm","c":"Metal Foils","s":10.0,"p":14.8,"a90":145.0,"dr":6,"ds":"critical","sup":"NIPPON GOKIN SDN BHD","st":"Re-purchase needed","stop":false,"lw":"2026-05-08"},{"n":"FGM301L-0.180x610x700mm","c":"Metal Foils","s":30.0,"p":13.8,"a90":175.0,"dr":15,"ds":"low","sup":"NIPPON GOKIN SDN BHD","st":"Re-purchase needed","stop":false,"lw":"2026-05-08"},{"n":"SUS304H-SR2-0.130x610x700mm","c":"Metal Foils","s":40.0,"p":8.0,"a90":100.0,"dr":36,"ds":"caution","sup":"NIPPON GOKIN SDN BHD","st":"Re-purchase needed","stop":false,"lw":"2026-04-23"},{"n":"SUS304H-SR2-0.500x610x700mm","c":"Metal Foils","s":10.0,"p":26.67,"a90":40.0,"dr":22,"ds":"low","sup":"NIPPON GOKIN SDN BHD","st":"Temporarily unavailable","stop":false,"lw":"2026-05-04"},{"n":"SUS304H-TA-0.200x600x700mm IST","c":"Metal Foils","s":25.0,"p":12.9,"a90":25.0,"dr":90,"ds":"ok","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2026-04-16"},{"n":"NL-SUS304H-TA-0.030x600x600mm","c":"Metal Foils","s":16.0,"p":null,"a90":10.0,"dr":144,"ds":"ok","sup":"","st":"","stop":false,"lw":"2026-04-16"},{"n":"FGM301L-0.130x610x500mm","c":"Metal Foils","s":60.0,"p":7.0,"a90":30.0,"dr":180,"ds":"ok","sup":"NIPPON GOKIN SDN BHD","st":"In stock","stop":false,"lw":"2026-04-20"},{"n":"FGM301L-0.120x610x700mm","c":"Metal Foils","s":75.0,"p":8.7,"a90":200.0,"dr":34,"ds":"caution","sup":"NIPPON GOKIN SDN BHD","st":"Re-purchase needed","stop":false,"lw":"2026-05-08"},{"n":"NICKEL-0.080x610x610mm","c":"Metal Foils","s":7.0,"p":75.0,"a90":3.0,"dr":210,"ds":"ok","sup":"NIPPON GOKIN SDN BHD","st":"","stop":false,"lw":"2026-04-17"},{"n":"SUS304H-SR2-0.150x610x700mm","c":"Metal Foils","s":50.0,"p":8.8,"a90":90.0,"dr":50,"ds":"caution","sup":"NIPPON GOKIN SDN BHD","st":"Re-purchase needed","stop":false,"lw":"2026-04-09"},{"n":"SUS304H-TA-0.150x600x700mm IST","c":"Metal Foils","s":125.0,"p":5.38,"a90":50.0,"dr":225,"ds":"ok","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2026-04-24"},{"n":"FGNL-SUS304H-TA-0.060x610x700mm","c":"Metal Foils","s":14.0,"p":10.55,"a90":29.0,"dr":43,"ds":"caution","sup":"NIPPON GOKIN SDN BHD","st":"","stop":false,"lw":"2026-05-07"},{"n":"FGM301L-0.080x610x500mm","c":"Metal Foils","s":50.0,"p":7.3,"a90":100.0,"dr":45,"ds":"caution","sup":"NIPPON GOKIN SDN BHD","st":"Re-purchase needed","stop":false,"lw":"2026-05-06"},{"n":"FGM301L-0.080x610x700mm","c":"Metal Foils","s":150.0,"p":8.38,"a90":180.0,"dr":75,"ds":"ok","sup":"NIPPON GOKIN SDN BHD","st":"Re-purchase needed","stop":false,"lw":"2026-04-23"},{"n":"FGM301L-0.250x610x700mm","c":"Metal Foils","s":30.0,"p":15.45,"a90":20.0,"dr":135,"ds":"ok","sup":"NIPPON GOKIN SDN BHD","st":"","stop":false,"lw":"2026-04-28"},{"n":"FGM301L-0.100x610x970mm","c":"Metal Foils","s":8.0,"p":10.85,"a90":10.0,"dr":72,"ds":"ok","sup":"NIPPON GOKIN SDN BHD","st":"","stop":false,"lw":"2026-05-05"},{"n":"SUS304-FG-0.020x570x700mm IST","c":"Metal Foils","s":48.0,"p":28.24,"a90":56.0,"dr":77,"ds":"ok","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2026-05-04"},{"n":"MAGNET-0.050x610x700mm","c":"Metal Foils","s":140.0,"p":7.8,"a90":50.0,"dr":252,"ds":"ok","sup":"NIPPON GOKIN SDN BHD","st":"","stop":false,"lw":"2026-04-07"},{"n":"SUS304-FG-0.025x570x700mm IST","c":"Metal Foils","s":57.0,"p":20.82,"a90":39.0,"dr":132,"ds":"ok","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2026-05-05"},{"n":"SUS304H-TA-1.000x610x610mm","c":"Metal Foils","s":75.0,"p":null,"a90":7.0,"dr":964,"ds":"ok","sup":"","st":"","stop":false,"lw":"2026-04-10"},{"n":"SUS304H-SR2-0.080x610x700mm","c":"Metal Foils","s":120.0,"p":7.4,"a90":40.0,"dr":270,"ds":"ok","sup":"NIPPON GOKIN SDN BHD","st":"Re-purchase needed","stop":false,"lw":"2026-04-24"},{"n":"SUS304-NL-0.070x600x800mm","c":"Metal Foils","s":13.0,"p":18.5,"a90":1.0,"dr":1170,"ds":"ok","sup":"NIPPON GOKIN SDN BHD","st":"","stop":false,"lw":"2026-04-16"},{"n":"FGM301L-0.150x610x970mm","c":"Metal Foils","s":17.0,"p":14.1,"a90":10.0,"dr":153,"ds":"ok","sup":"NIPPON GOKIN SDN BHD","st":"Temporarily unavailable","stop":false,"lw":"2026-04-07"},{"n":"SUS304H-SR2-0.400x610x700mm","c":"Metal Foils","s":190.0,"p":null,"a90":10.0,"dr":1710,"ds":"ok","sup":"","st":"","stop":false,"lw":"2026-04-28"},{"n":"MAGNET-0.800x610x700mm","c":"Metal Foils","s":178.0,"p":15.05,"a90":18.0,"dr":890,"ds":"ok","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2026-04-17"},{"n":"FGM301L-0.100x610x500mm","c":"Metal Foils","s":40.0,"p":5.8,"a90":40.0,"dr":90,"ds":"ok","sup":"NIPPON GOKIN SDN BHD","st":"Re-purchase needed","stop":true,"lw":"2026-02-16"},{"n":"FGM301L-0.110x610x700mm","c":"Metal Foils","s":50.0,"p":7.95,"a90":30.0,"dr":150,"ds":"ok","sup":"NIPPON GOKIN SDN BHD","st":"Re-purchase needed","stop":false,"lw":"2026-03-21"},{"n":"FGM301L-0.140x610x700mm","c":"Metal Foils","s":18.0,"p":12.82,"a90":2.0,"dr":810,"ds":"ok","sup":"NIPPON GOKIN SDN BHD","st":"","stop":true,"lw":"2026-02-27"},{"n":"FGM301L-0.080x610x970mm","c":"Metal Foils","s":10.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"NIPPON GOKIN SDN BHD","st":"","stop":true,"lw":"2025-03-19"},{"n":"FGM301L-0.120x610x970mm","c":"Metal Foils","s":9.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2025-03-06"},{"n":"FGM301L-0.130x610x970mm","c":"Metal Foils","s":5.0,"p":12.3,"a90":8.0,"dr":56,"ds":"caution","sup":"NIPPON GOKIN SDN BHD","st":"Re-purchase needed","stop":false,"lw":"2026-03-31"},{"n":"FGM301L-0.180x610x970mm","c":"Metal Foils","s":24.0,"p":19.2,"a90":7.0,"dr":309,"ds":"ok","sup":"NIPPON GOKIN SDN BHD","st":"","stop":false,"lw":"2026-05-06"},{"n":"NL-SUS304H-TA-0.040x600x800mm","c":"Metal Foils","s":32.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2026-01-16"},{"n":"SUS304-NL-0.070x600x600mm","c":"Metal Foils","s":43.0,"p":19.3,"a90":null,"dr":null,"ds":"nodata","sup":"NIPPON GOKIN SDN BHD","st":"Temporarily unavailable","stop":true,"lw":"2025-09-23"},{"n":"SUS304H-SR2-0.090x610x700mm","c":"Metal Foils","s":0.0,"p":3.76,"a90":null,"dr":0,"ds":"zero","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2025-03-28"},{"n":"SUS304H-SR2-0.110x600x700mm","c":"Metal Foils","s":75.0,"p":7.5,"a90":null,"dr":null,"ds":"nodata","sup":"NIPPON GOKIN SDN BHD","st":"Re-purchase needed","stop":true,"lw":"2026-01-16"},{"n":"SUS304H-SR2-0.140x610x700mm","c":"Metal Foils","s":200.0,"p":null,"a90":25.0,"dr":720,"ds":"ok","sup":"BONMARK","st":"","stop":false,"lw":"2026-03-26"},{"n":"SUS304H-TA-0.180x680x680mm","c":"Metal Foils","s":9.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":""},{"n":"SUS304H-SR2-0.180x610x700mm","c":"Metal Foils","s":120.0,"p":11.5,"a90":null,"dr":null,"ds":"nodata","sup":"NIPPON GOKIN SDN BHD","st":"","stop":true,"lw":"2026-01-30"},{"n":"MX-SUS304H-TA-0.20x610x700mm","c":"Metal Foils","s":23.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2025-04-26"},{"n":"SUS304H-SR2-0.200x610x700mm","c":"Metal Foils","s":40.0,"p":11.65,"a90":45.0,"dr":80,"ds":"ok","sup":"NIPPON GOKIN SDN BHD","st":"","stop":false,"lw":"2026-04-02"},{"n":"SUS304H-SR2-0.230x610x700mm","c":"Metal Foils","s":60.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2025-12-09"},{"n":"SUS304H-SR2-0.250x610x700mm","c":"Metal Foils","s":20.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"BONMARK","st":"","stop":true,"lw":"2025-12-19"},{"n":"MX-SUS304H-TA-0.300x600x700mm","c":"Metal Foils","s":0.0,"p":11.8,"a90":10.0,"dr":0,"ds":"zero","sup":"NIPPON GOKIN SDN BHD","st":"Temporarily unavailable","stop":false,"lw":"2026-02-19"},{"n":"SUS304H-SR2-0.300x610x700mm","c":"Metal Foils","s":10.0,"p":18.1,"a90":20.0,"dr":45,"ds":"caution","sup":"NIPPON GOKIN SDN BHD","st":"Re-purchase needed","stop":false,"lw":"2026-04-02"},{"n":"SUS304H-SR2-0.600x610x610mm","c":"Metal Foils","s":4.0,"p":34.09,"a90":null,"dr":null,"ds":"nodata","sup":"NIPPON GOKIN SDN BHD","st":"","stop":true,"lw":"2025-01-31"},{"n":"SUS304H-SR2-1.000x610x700mm","c":"Metal Foils","s":5.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":""},{"n":"MAGNET-0.060x610x700mm","c":"Metal Foils","s":0.0,"p":7.05,"a90":null,"dr":0,"ds":"zero","sup":"NIPPON GOKIN SDN BHD","st":"","stop":false,"lw":"2024-08-02"},{"n":"MAGNET-0.080x610x700mm","c":"Metal Foils","s":30.0,"p":8.4,"a90":null,"dr":null,"ds":"nodata","sup":"NIPPON GOKIN SDN BHD","st":"","stop":true,"lw":"2025-12-01"},{"n":"MAGNET-0.100x610x700mm","c":"Metal Foils","s":0.0,"p":6.27,"a90":null,"dr":0,"ds":"zero","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":""},{"n":"MAGNET-0.100x610x800mm","c":"Metal Foils","s":0.0,"p":12.15,"a90":200.0,"dr":0,"ds":"zero","sup":"NIPPON GOKIN SDN BHD","st":"","stop":false,"lw":"2026-05-07"},{"n":"MAGNET-0.150x610x700mm","c":"Metal Foils","s":150.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"NIPPON GOKIN SDN BHD","st":"","stop":true,"lw":""},{"n":"MAGNET-0.200x610x700mm","c":"Metal Foils","s":0.0,"p":14.8,"a90":null,"dr":0,"ds":"zero","sup":"NIPPON GOKIN SDN BHD","st":"","stop":false,"lw":"2024-12-30"},{"n":"MAGNET-0.300x600x600mm","c":"Metal Foils","s":25.0,"p":6.79,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":"2024-12-30"},{"n":"MAGNET-0.460x610x700mm","c":"Metal Foils","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":""},{"n":"MAGNET-0.500x600x600mm","c":"Metal Foils","s":0.0,"p":12.9,"a90":null,"dr":0,"ds":"zero","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":""},{"n":"MAGNET-0.800x610x338mm","c":"Metal Foils","s":53.0,"p":7.39,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":""},{"n":"MAGNET-1.000x610x700mm","c":"Metal Foils","s":86.0,"p":19.11,"a90":1.0,"dr":7740,"ds":"ok","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":"2026-03-12"},{"n":"MAGNET-1.000x610x338mm","c":"Metal Foils","s":42.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":""},{"n":"NICKEL-0.040x420x520mm","c":"Metal Foils","s":4.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":""},{"n":"NICKEL-0.050x420x520mm","c":"Metal Foils","s":6.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":""},{"n":"NICKEL-0.060x420x520mm","c":"Metal Foils","s":6.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":""},{"n":"NICKEL-0.060x610x635mm","c":"Metal Foils","s":15.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2024-11-29"},{"n":"NICKEL-0.080x550x610mm","c":"Metal Foils","s":0.0,"p":105.0,"a90":null,"dr":0,"ds":"zero","sup":"NIPPON GOKIN SDN BHD","st":"","stop":false,"lw":"2025-05-26"},{"n":"NICKEL-0.090x420x520mm","c":"Metal Foils","s":9.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":""},{"n":"SUS304H-SR2-0.100x610x800mm","c":"Metal Foils","s":125.0,"p":null,"a90":19.0,"dr":592,"ds":"ok","sup":"NIPPON GOKIN SDN BHD","st":"","stop":true,"lw":"2026-02-28"},{"n":"SUS304H-SR2-0.120x610x800mm","c":"Metal Foils","s":0.0,"p":5.41,"a90":null,"dr":0,"ds":"zero","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":""},{"n":"SUS304H-SR2-0.130x610x800mm","c":"Metal Foils","s":133.0,"p":5.86,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":""},{"n":"SUS304H-TA-0.100x600x700mm IST","c":"Metal Foils","s":350.0,"p":4.06,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":"2025-12-17"},{"n":"SUS304H-TA-0.120x600x700mm IST","c":"Metal Foils","s":0.0,"p":4.73,"a90":null,"dr":0,"ds":"zero","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2026-01-14"},{"n":"SUS304H-TA-0.130x600x700mm IST","c":"Metal Foils","s":75.0,"p":5.13,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":"2025-12-17"},{"n":"SUS304H-SR2-0.350x610x700mm","c":"Metal Foils","s":0.0,"p":28.8,"a90":null,"dr":0,"ds":"zero","sup":"NIPPON GOKIN SDN BHD","st":"","stop":false,"lw":"2025-09-11"},{"n":"SUS304H-SR2-0.180x600x635mm","c":"Metal Foils","s":8.0,"p":5.57,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":""},{"n":"SUS301EH-TA-0.300x610x600mm","c":"Metal Foils","s":0.0,"p":6.15,"a90":null,"dr":0,"ds":"zero","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":""},{"n":"SUS304H-SR2-0.700x610x610mm","c":"Metal Foils","s":19.0,"p":28.5,"a90":null,"dr":null,"ds":"nodata","sup":"NIPPON GOKIN SDN BHD","st":"Temporarily unavailable","stop":true,"lw":"2026-01-10"},{"n":"FGM-0.070x600x700mm IST","c":"Metal Foils","s":20.0,"p":6.83,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":"2026-01-27"},{"n":"SUS304H-SR2-0.200x610x700mm IST","c":"Metal Foils","s":0.0,"p":6.93,"a90":null,"dr":0,"ds":"zero","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2025-12-01"},{"n":"FGM304-0.080x600x700mm IST","c":"Metal Foils","s":0.0,"p":6.31,"a90":null,"dr":0,"ds":"zero","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2025-12-13"},{"n":"FGM304-0.080x600x500mm IST","c":"Metal Foils","s":100.0,"p":4.51,"a90":100.0,"dr":90,"ds":"ok","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":"2026-03-06"},{"n":"SUS304H-TA-0.110x600x700mm IST","c":"Metal Foils","s":0.0,"p":3.23,"a90":null,"dr":0,"ds":"zero","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2025-09-04"},{"n":"FGM304-0.100x600x700mm IST","c":"Metal Foils","s":0.0,"p":7.17,"a90":null,"dr":0,"ds":"zero","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2026-01-14"},{"n":"SUS304H-SR2-0.130x610x700mm IST","c":"Metal Foils","s":0.0,"p":4.63,"a90":null,"dr":0,"ds":"zero","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2025-11-12"},{"n":"SUS304H-SR2-0.080x610x700mm IST","c":"Metal Foils","s":0.0,"p":4.21,"a90":null,"dr":0,"ds":"zero","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2025-06-04"},{"n":"SUS304H-SR2-0.120x610x700mm IST","c":"Metal Foils","s":0.0,"p":4.73,"a90":null,"dr":0,"ds":"zero","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2025-07-03"},{"n":"SUS304H-SR2-0.150x610x700mm IST","c":"Metal Foils","s":0.0,"p":5.38,"a90":null,"dr":0,"ds":"zero","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":""},{"n":"FGM304-0.120x600x700mm IST","c":"Metal Foils","s":150.0,"p":8.46,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":"2026-01-19"},{"n":"FGM301L-0.180x610x700mm IST","c":"Metal Foils","s":130.0,"p":10.97,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":"2025-10-28"},{"n":"MAGNET-0.200x600x800mm","c":"Metal Foils","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"NIPPON GOKIN SDN BHD","st":"","stop":false,"lw":""},{"n":"FGM304-0.100x600x500mm IST","c":"Metal Foils","s":40.0,"p":5.12,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":"2025-12-09"},{"n":"FGM304-0.150x600x500mm IST","c":"Metal Foils","s":40.0,"p":6.72,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":""},{"n":"FGM304-0.150x600x700mm IST","c":"Metal Foils","s":0.0,"p":9.41,"a90":20.0,"dr":0,"ds":"zero","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2026-03-14"},{"n":"FGM304-0.150x600x700mm IST","c":"Metal Foils","s":0.0,"p":4.06,"a90":20.0,"dr":0,"ds":"zero","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2026-03-14"},{"n":"SUS304H-SR2-0.110x610x700mm IST","c":"Metal Foils","s":0.0,"p":4.47,"a90":null,"dr":0,"ds":"zero","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":""},{"n":"FGM304-0.200x600x700mm IST","c":"Metal Foils","s":55.0,"p":12.19,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":""},{"n":"SUS304H-0.050x610x830mm Bon Mark","c":"Metal Foils","s":0.0,"p":null,"a90":10.0,"dr":0,"ds":"zero","sup":"BONMARK","st":"","stop":false,"lw":"2026-04-03"},{"n":"Al-Frame-29x29inch(40x40x2.5mm)","c":"Frames","s":100.0,"p":16.27,"a90":400.0,"dr":22,"ds":"low","sup":"IST (SHANGHAI) CO., LTD.","st":"Re-purchase needed","stop":false,"lw":"2026-04-27"},{"n":"Al-Frame-29x29inch(30x40x2.5mm)","c":"Frames","s":516.0,"p":13.28,"a90":1368.0,"dr":34,"ds":"caution","sup":"IST (SHANGHAI) CO., LTD.","st":"In stock","stop":false,"lw":"2026-05-08"},{"n":"Al-Frame-29x29inch(12.7x38.1x2.5mm)","c":"Frames","s":79.0,"p":15.32,"a90":52.0,"dr":137,"ds":"ok","sup":"IST (SHANGHAI) CO., LTD.","st":"Re-purchase needed","stop":false,"lw":"2026-05-05"},{"n":"Al-Frame-29x29inch(15x40x2.5mm) Plexus","c":"Frames","s":71.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"Sold out","stop":true,"lw":"2026-02-10"},{"n":"Al-Frame-29x29inch(30x30x2.5mm) Celestica","c":"Frames","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2025-07-08"},{"n":"Al-Frame-29x31inch(30x40x2.5mm)","c":"Frames","s":11.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":""},{"n":"Al-Frame-31x31inch(30x40x2.5mm) Celestica","c":"Frames","s":44.0,"p":null,"a90":6.0,"dr":660,"ds":"ok","sup":"","st":"","stop":false,"lw":"2026-04-04"},{"n":"Al-Frame-37x30inch(30x40x2.5mm)","c":"Frames","s":7.0,"p":null,"a90":8.0,"dr":79,"ds":"ok","sup":"K.T.E. CO., LTD.","st":"","stop":false,"lw":"2026-05-09"},{"n":"Al-Frame-29x29inch(30x40-20x2.5mm) QMB","c":"Frames","s":57.0,"p":13.51,"a90":93.0,"dr":55,"ds":"caution","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2026-04-27"},{"n":"Al-Frame-23x23inch(25x40x2.0mm)","c":"Frames","s":0.0,"p":8.74,"a90":150.0,"dr":0,"ds":"zero","sup":"IST (SHANGHAI) CO., LTD.","st":"Re-purchase needed","stop":false,"lw":"2026-04-17"},{"n":"Al-Frame-23x23inch(25x40x2.0mm) M6","c":"Frames","s":25.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":""},{"n":"Al-Frame-23x23inch(30x40x2.5mm) M6","c":"Frames","s":84.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2025-06-30"},{"n":"Al-Frame-23x23inch(25x40x2.0mm) 1/4","c":"Frames","s":15.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":""},{"n":"Al-Frame-650x550mm(30x40x2.5mm)","c":"Frames","s":20.0,"p":11.05,"a90":342.0,"dr":5,"ds":"critical","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2026-05-06"},{"n":"Al-Frame-650x550mm(15x40x2.5mm)","c":"Frames","s":111.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2025-06-18"},{"n":"Al-Frame-650x550mm(30x40x3.0mm) Pioneer","c":"Frames","s":4.0,"p":14.27,"a90":3.0,"dr":120,"ds":"ok","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2026-04-23"},{"n":"Al-Frame-650x650mm(30x40x2.5mm)","c":"Frames","s":38.0,"p":12.03,"a90":150.0,"dr":23,"ds":"low","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2026-05-09"},{"n":"Al-Frame-650x750mm(30x40x2.5mm)","c":"Frames","s":42.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2025-06-18"},{"n":"Al-Frame-650x736mm(30x40x2.5mm)","c":"Frames","s":10.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2025-03-13"},{"n":"Al-Frame-600x550mm(30x40x2.5mm)","c":"Frames","s":0.0,"p":10.67,"a90":155.0,"dr":0,"ds":"zero","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2026-04-27"},{"n":"Al-Frame-600x550mm(30x40x3.0mm) Calcomp","c":"Frames","s":58.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":""},{"n":"Al-Frame-736x550mm(30x40x2.5mm)","c":"Frames","s":150.0,"p":11.93,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":"2025-12-19"},{"n":"Al-Frame-750x550mm(30x40x2.5mm)","c":"Frames","s":15.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2023-08-16"},{"n":"Al-Frame-800x580mm(30x40x2.5mm)","c":"Frames","s":35.0,"p":12.81,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":"2025-09-01"},{"n":"Al-Frame-580x580mm(25x40x2.0mm)","c":"Frames","s":13.0,"p":8.95,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":"2025-10-17"},{"n":"Al-Frame-1200x800mm(30x40x2.5mm)","c":"Frames","s":11.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":""},{"n":"Al-Frame-450x450mm(20x30x2.0mm) Siix","c":"Frames","s":26.0,"p":null,"a90":4.0,"dr":585,"ds":"ok","sup":"","st":"","stop":false,"lw":"2026-04-23"},{"n":"SUS-Frame-29x29inch(32x32x2.0mm) Celestica","c":"Frames","s":15.0,"p":null,"a90":27.0,"dr":50,"ds":"caution","sup":"S THREE MOLD CO., LTD.","st":"","stop":false,"lw":"2026-04-20"},{"n":"Adaptor-29x29inch(25.4x38.1x2.0) with 2 pins 80/100 (Plexus)","c":"Frames","s":1.0,"p":15.0,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":""},{"n":"Adaptor-29x29inch(25.4x38.1x2.0) with 2 pins same side (Plexus)","c":"Frames","s":3.0,"p":22.06,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":"2025-12-11"},{"n":"Al-Frame-29x29inch(30x40x2.5mm) Anodizing (Black)","c":"Frames","s":3.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2025-03-13"},{"n":"Al-Frame-650x680mm(30x40x2.5mm)","c":"Frames","s":191.0,"p":12.25,"a90":83.0,"dr":207,"ds":"ok","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2026-05-05"},{"n":"Al-Frame-760x940mm(30x37)","c":"Frames","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"K.T.E. CO., LTD.","st":"","stop":false,"lw":""},{"n":"Al-Frame-29x29inch(30x40x2.5mm) Green","c":"Frames","s":35.0,"p":20.74,"a90":35.0,"dr":90,"ds":"ok","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2026-03-25"},{"n":"Al-Frame-736x736mm(30x40x2.5mm) - Inventec","c":"Frames","s":3.0,"p":null,"a90":6.0,"dr":45,"ds":"caution","sup":"K.T.E. CO., LTD.","st":"","stop":false,"lw":"2026-04-24"},{"n":"Al-Frame-900x1100mm(30x40x3mm)","c":"Frames","s":18.0,"p":null,"a90":23.0,"dr":70,"ds":"ok","sup":"K.T.E. CO., LTD.","st":"","stop":false,"lw":"2026-05-06"},{"n":"Mesh Frames-29''x29'' (30x40x2.5mm) 60N","c":"Frames","s":0.0,"p":18.01,"a90":null,"dr":0,"ds":"zero","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":""},{"n":"Al-Frame-736x736mm(30x40x2.5mm)","c":"Frames","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"VS SUPPLY","st":"","stop":false,"lw":""},{"n":"NB-C1-385mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2025-09-08"},{"n":"NB-C1-322mmx1500meter","c":"Wiper Rolls","s":26.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"In stock","stop":false,"lw":"2026-05-10"},{"n":"NB-C100-420mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2025-10-24"},{"n":"NB-C1-650mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2026-02-24"},{"n":"NB-C1-525mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2025-12-11"},{"n":"NB-C1-460mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2025-10-24"},{"n":"NB-C1-300mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"In stock","stop":false,"lw":"2024-10-15"},{"n":"NB-C1-357mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"Temporarily unavailable","stop":false,"lw":"2026-01-29"},{"n":"NB-C1-360mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"Re-purchase needed","stop":false,"lw":"2023-09-19"},{"n":"NB-C1-420mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2025-05-07"},{"n":"NB-C1-537mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2024-10-17"},{"n":"NB-C1-557mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":""},{"n":"NB-C1-560mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2025-01-11"},{"n":"NB-C1-644mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2024-08-21"},{"n":"NB-C1-805mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2024-10-17"},{"n":"XL-C1-169mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2024-10-17"},{"n":"XL-C1-264mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2024-10-17"},{"n":"XL-C1-277mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2024-08-15"},{"n":"XL-C1-315mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2024-10-16"},{"n":"XL-C1-339mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":""},{"n":"XL-C1-381mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2024-07-02"},{"n":"XL-C1-420mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2023-09-21"},{"n":"XL-C1-435mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2024-10-17"},{"n":"XL-C1-466mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":""},{"n":"XL-C1-528mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2024-12-18"},{"n":"XL-C1-610mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":""},{"n":"NB-C100-268mmx1500meter","c":"Wiper Rolls","s":6.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2025-05-07"},{"n":"NB-C100-292mmx1500meter","c":"Wiper Rolls","s":4.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2025-12-06"},{"n":"NB-C100-322mmx1500meter","c":"Wiper Rolls","s":45.0,"p":108.19,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":"2025-01-08"},{"n":"NB-C100-339mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":""},{"n":"NB-C100-385mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2024-11-18"},{"n":"NB-C100-435mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":""},{"n":"NB-C100-460mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2025-10-24"},{"n":"NB-C100-466mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":""},{"n":"NB-C100-525mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2026-02-23"},{"n":"NB-C100-537mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2026-02-09"},{"n":"NB-C100-550mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":""},{"n":"NB-C100-560mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2024-08-05"},{"n":"NB-C100-644mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2024-08-06"},{"n":"IST-HYP-300mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2025-02-26"},{"n":"IST-HYP-360mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2025-02-26"},{"n":"IST-HYP-366mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2025-02-26"},{"n":"IST-HYP-381mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2025-02-26"},{"n":"IST-HYP-440mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2025-02-26"},{"n":"IST-HYP-550mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2023-10-19"},{"n":"NB-C1-515mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2024-11-19"},{"n":"XL-C1-320mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2024-10-16"},{"n":"XL-C1-488mmx1500meter","c":"Wiper Rolls","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":""},{"n":"NB-C100-650mmx1500meter","c":"Wiper Rolls","s":2.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2026-02-25"},{"n":"Chemicrete4 Part-A (White,25Kg) ( Production ) use","c":"Consumables","s":3.0,"p":689.0,"a90":null,"dr":null,"ds":"nodata","sup":"DASH PTE LTD","st":"In stock","stop":false,"lw":"2026-05-10"},{"n":"Chemicrete1 Part-B (Black,12.5Kg) ( Production ) use","c":"Consumables","s":3.0,"p":386.0,"a90":null,"dr":null,"ds":"nodata","sup":"DASH PTE LTD","st":"Temporarily unavailable","stop":false,"lw":"2026-04-22"},{"n":"Epoxies1 Part-A (CTA21-Catalyst, White) ( Production ) use","c":"Consumables","s":0.0,"p":195.88,"a90":null,"dr":0,"ds":"zero","sup":"EPOXIES ETC","st":"Re-purchase needed","stop":false,"lw":"2025-05-29"},{"n":"Epoxies2 Part-B (RGR21-Resin, Gray) ( Production ) use","c":"Consumables","s":3.0,"p":195.88,"a90":null,"dr":null,"ds":"nodata","sup":"EPOXIES ETC","st":"Sold out","stop":true,"lw":"2025-06-10"},{"n":"Araldite1 Part-A (H-HW5323, Hardener-Black) ( Production ) use","c":"Consumables","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"N&N INTERTRADE (1999) CO., LTD.","st":"","stop":false,"lw":"2026-05-09"},{"n":"Araldite2 Part-B (R-AW139-1,Resin-White) ( Production ) use","c":"Consumables","s":1.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"N&N INTERTRADE (1999) CO., LTD.","st":"","stop":false,"lw":"2026-05-09"},{"n":"IST-24T-150umx175cmW (meter) ( Production ) use","c":"Consumables","s":653.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":false,"lw":"2026-05-05"},{"n":"SEFAR-100W-100umx165cmW (meter)","c":"Consumables","s":720.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2024-07-27"},{"n":"Mesh 180x165cmW (meter)","c":"Consumables","s":250.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2026-01-07"},{"n":"Kapton Dots 8mm (200/pad)","c":"Consumables","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2024-07-19"},{"n":"Kapton Dots 8mm (240/pad)","c":"Consumables","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2024-10-01"},{"n":"Kapton Dots 5mm (600/pad)","c":"Consumables","s":4200.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2024-09-20"},{"n":"Carton Box 560X426X375mm (Wiper Roll) use","c":"Consumables","s":660.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"PRIMAX GENERAL CO.,LTD.","st":"","stop":false,"lw":"2026-04-08"},{"n":"Carton Box 560x426x175mm (Wiper Roll) use","c":"Consumables","s":1000.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"PRIMAX GENERAL CO.,LTD.","st":"","stop":true,"lw":"2025-07-30"},{"n":"Carton Box 670x50x695mm (Stencil) Production use","c":"Consumables","s":750.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"PRIMAX GENERAL CO.,LTD.","st":"","stop":false,"lw":"2026-04-28"},{"n":"Carton Box 755x60x832mm (Stencil) Production use","c":"Consumables","s":750.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"PRIMAX GENERAL CO.,LTD.","st":"","stop":false,"lw":"2026-04-28"},{"n":"Carton Box 850x70x890mm (Stencil) Production use","c":"Consumables","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"PRIMAX GENERAL CO.,LTD.","st":"","stop":false,"lw":"2024-09-02"},{"n":"Carton Padding 520X630mm ( Production ) use","c":"Consumables","s":150.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"PRIMAX GENERAL CO.,LTD.","st":"","stop":false,"lw":"2026-04-02"},{"n":"Carton Padding 590x652mm ( Production ) use","c":"Consumables","s":300.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"PRIMAX GENERAL CO.,LTD.","st":"","stop":true,"lw":"2025-10-20"},{"n":"Carton Padding 715x810mm ( Production ) use","c":"Consumables","s":200.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"PRIMAX GENERAL CO.,LTD.","st":"","stop":true,"lw":"2025-09-23"},{"n":"Side Gear Assembly","c":"Consumables","s":11.0,"p":63.0,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2026-04-27"},{"n":"Center Gear Assembly","c":"Consumables","s":14.0,"p":106.0,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2026-03-30"},{"n":"Bearings","c":"Consumables","s":50.0,"p":2.0,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":""},{"n":"Heating Element","c":"Consumables","s":2.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":""},{"n":"Heating Table (Mounting Table)","c":"Consumables","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2024-09-22"},{"n":"Heating Table (Stretching Table)","c":"Consumables","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2025-01-26"},{"n":"Pneumatic Cylinder (\u0e01\u0e23\u0e30\u0e1a\u0e2d\u0e01\u0e2a\u0e39\u0e1a\u0e25\u0e21)","c":"Consumables","s":8.0,"p":18.7,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":"2025-08-21"},{"n":"Pneumatic Switch","c":"Consumables","s":4.0,"p":9.5,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2026-03-24"},{"n":"Clamp","c":"Consumables","s":10.0,"p":46.5,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":"2026-02-11"},{"n":"Rubber Grip (\u0e41\u0e1c\u0e48\u0e19\u0e22\u0e32\u0e07\u0e23\u0e2d\u0e07) ( Production ) use","c":"Consumables","s":40.0,"p":1.58,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2026-05-08"},{"n":"Dry Film Eternal HT-115F ( Step ) use","c":"Consumables","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2024-10-18"},{"n":"Ferric Chloride 40% ( Step ) use","c":"Consumables","s":30.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"UNCHING INDUSTRY CO.,LTD.","st":"","stop":false,"lw":"2026-05-04"},{"n":"Ferric Chloride 46% ( Step ) use","c":"Consumables","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":""},{"n":"Soda Ash Light (Sodium Bicarbonate) ( Step ) use","c":"Consumables","s":27.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"KASA LLP.","st":"","stop":true,"lw":"2024-10-23"},{"n":"Sodium Hydroxide (Caustic Soda) ( Step ) use","c":"Consumables","s":1.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"KASA LLP.","st":"","stop":true,"lw":"2024-10-23"},{"n":"Sulfuric Acid 98% ( Production ) use","c":"Consumables","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"KASA LLP.","st":"","stop":false,"lw":"2025-12-02"},{"n":"Phosphoric Acid 85% ( Production ) use","c":"Consumables","s":3.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"KASA LLP.","st":"","stop":false,"lw":"2026-05-04"},{"n":"Nitric Acid 68% ( Production ) use","c":"Consumables","s":1.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"KASA LLP.","st":"","stop":false,"lw":"2026-05-04"},{"n":"Masking Tape 1\" 40 yards Inter Tape ( Production ) use","c":"Consumables","s":592.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"SLP NAVANAKORN LLP.","st":"","stop":false,"lw":"2026-05-09"},{"n":"Masking Tape 1 1/2\" 40 yards Inter Tape ( Production ) use","c":"Consumables","s":92.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"SLP NAVANAKORN LLP.","st":"","stop":false,"lw":"2026-05-07"},{"n":"Masking Tape 1/2\" 40 yards Inter Tape ( Production ) use","c":"Consumables","s":72.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"SLP NAVANAKORN LLP.","st":"","stop":false,"lw":"2026-03-24"},{"n":"Double sided Tape 1/2\" Armstrong ( Production ) use","c":"Consumables","s":48.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2025-09-22"},{"n":"Transparent Packaging Tape OPP 2\" ( Production ) use","c":"Consumables","s":24.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"SLP NAVANAKORN LLP.","st":"","stop":false,"lw":"2026-05-08"},{"n":"Silver Tape 4 cm ( Production ) use","c":"Consumables","s":4.0,"p":7.9,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2026-04-28"},{"n":"Silver Tape 6 cm ( Production ) use","c":"Consumables","s":8.0,"p":11.32,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2026-05-06"},{"n":"Silver Tape 7 cm ( Production ) use","c":"Consumables","s":0.0,"p":13.8,"a90":null,"dr":0,"ds":"zero","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2026-04-28"},{"n":"Emulsion Blue ( Production ) use","c":"Consumables","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"K.T.E. CO., LTD.","st":"","stop":false,"lw":"2026-05-10"},{"n":"Thinner AAA ( Production ) use","c":"Consumables","s":11.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"S.K.P. RUNGRUEANG LLP.","st":"","stop":false,"lw":"2026-05-07"},{"n":"Paper Sheet (Mini Stencil) ( Production ) use","c":"Consumables","s":81.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"SLP NAVANAKORN LLP.","st":"","stop":false,"lw":"2026-05-09"},{"n":"Stretch Film ( Production ) use","c":"Consumables","s":6.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"SLP NAVANAKORN LLP.","st":"","stop":false,"lw":"2026-05-07"},{"n":"Paper Plate ( Production ) use","c":"Consumables","s":2000.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"SLP NAVANAKORN LLP.","st":"","stop":false,"lw":"2026-05-08"},{"n":"Thermal Paper ( QC ) use","c":"Consumables","s":14.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"SLP NAVANAKORN LLP.","st":"","stop":false,"lw":"2026-04-28"},{"n":"IPA ( Production ) use","c":"Consumables","s":2.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"RCI LABSCAN LIMITED","st":"","stop":false,"lw":"2026-04-21"},{"n":"PVC Shrink Film 127xR 50-60R - 5R ( Wiper Roll )","c":"Consumables","s":3.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"NEW MODERN SUPER PACK CO., LTD.","st":"","stop":false,"lw":"2026-04-03"},{"n":"PVC Shrink Film 203xR 50-60R - 8R ( Wiper Roll )","c":"Consumables","s":32.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"NEW MODERN SUPER PACK CO., LTD.","st":"","stop":true,"lw":"2025-06-20"},{"n":"Hi-Temp Polyimide Tape (Technol 278)","c":"Consumables","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2025-09-09"},{"n":"C1 Wiper Sheet 9\"x9\"","c":"Consumables","s":155.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"EVERSHIELD CO.,LTD.","st":"","stop":false,"lw":"2026-04-02"},{"n":"C1 Wiper Sheet 6\"x6\" ( Production ) use","c":"Consumables","s":427.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2025-06-16"},{"n":"C1 Wiper Sheet 4\"x4\"","c":"Consumables","s":494.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"EVERSHIELD CO.,LTD.","st":"","stop":false,"lw":"2026-04-02"},{"n":"Lint Free 6\"x6\" (150pcs/pack)","c":"Consumables","s":85.0,"p":3.1,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2026-04-16"},{"n":"Special Plastic Core 455mm (White) Delta","c":"Consumables","s":4400.0,"p":0.25,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":"2025-01-08"},{"n":"Plastic Core 18 (1/2\") ID 19.5mm (Grey) ( Wiper Roll )","c":"Consumables","s":250.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":false,"lw":"2026-05-08"},{"n":"Plastic Core 20 (3/4\") ID 20mm (Blue)","c":"Consumables","s":211.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2026-01-15"},{"n":"Plastic Core 25 mm ID 20mm (White)","c":"Consumables","s":17.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2026-02-02"},{"n":"Plastic Core 32 mm ID 25mm (White)","c":"Consumables","s":19.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2026-02-26"},{"n":"Plastic Core 34 mm ID 32mm (Grey)","c":"Consumables","s":19.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2026-01-15"},{"n":"Plastic Core 40 mm ID 38mm (Blue)","c":"Consumables","s":12.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2026-01-15"},{"n":"Paper Core 360 mm ID 26mm ( Wiper Roll )","c":"Consumables","s":350.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":false,"lw":"2026-03-17"},{"n":"Paper Core 350 mm ID 38mm","c":"Consumables","s":30.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2024-12-28"},{"n":"Paper Core 545 mm ID 25mm","c":"Consumables","s":190.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2025-10-30"},{"n":"Paper Core 360 mm ID 38mm","c":"Consumables","s":525.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":""},{"n":"Paper Core 530 mm ID 38mm","c":"Consumables","s":63.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2023-10-07"},{"n":"Paper Core 355 mm ID 38mm","c":"Consumables","s":763.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":""},{"n":"Paper Core 350 mm ID 19.5mm","c":"Consumables","s":300.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2024-06-20"},{"n":"Paper Core 280 mm ID 38mm","c":"Consumables","s":258.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2024-05-07"},{"n":"Paper Core 300 mm ID 19.5mm","c":"Consumables","s":1000.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":""},{"n":"Paper Core 635 mm ID 19.5mm","c":"Consumables","s":250.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":""},{"n":"Plastic Bag 30X46mm ( Production ) use","c":"Consumables","s":45.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"S.K.P. RUNGRUEANG LLP.","st":"","stop":false,"lw":"2026-05-06"},{"n":"Spray Nozzles","c":"Consumables","s":96.0,"p":0.5,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":"2026-02-05"},{"n":"Paper Core 350 mm ID 26mm","c":"Consumables","s":750.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2025-01-07"},{"n":"72T-55-um-170cmW (meter)","c":"Consumables","s":0.0,"p":2.36,"a90":null,"dr":0,"ds":"zero","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2024-12-12"},{"n":"Carton Box 380X640X450mm (Wiper Roll) use","c":"Consumables","s":20.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"PRIMAX GENERAL CO.,LTD.","st":"","stop":true,"lw":"2026-02-28"},{"n":"Medical Gloves (\u0e16\u0e38\u0e07\u0e21\u0e37\u0e2d\u0e41\u0e1e\u0e17\u0e22\u0e4c) SIZE.L ( Production ) use","c":"Consumables","s":9.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":false,"lw":"2026-05-06"},{"n":"Rubber Gloves. \u0e16\u0e38\u0e07\u0e21\u0e37\u0e2d\u0e22\u0e32\u0e07\u0e2a\u0e35\u0e2a\u0e49\u0e21 ( Production ) use","c":"Consumables","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"LAZADA","st":"","stop":false,"lw":"2025-11-29"},{"n":"Rubber Gloves. \u0e16\u0e38\u0e07\u0e21\u0e37\u0e2d\u0e22\u0e32\u0e07\u0e2a\u0e35\u0e14\u0e33 ( Step ) use","c":"Consumables","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2025-12-07"},{"n":"Scotch Brite (Gray) \u0e2a\u0e01\u0e2d\u0e15\u0e44\u0e1a\u0e23\u0e4c \u0e2a\u0e35\u0e40\u0e17\u0e32 ( Production ) use","c":"Consumables","s":75.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"S.K.P. RUNGRUEANG LLP.","st":"","stop":false,"lw":"2026-05-08"},{"n":"Scotch Brite \u0e2a\u0e35\u0e40\u0e02\u0e35\u0e22\u0e27 ( Production ) use","c":"Consumables","s":2.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"LAZADA","st":"","stop":false,"lw":"2026-04-30"},{"n":"Sandpaper No.80 (\u0e01\u0e23\u0e30\u0e14\u0e32\u0e29\u0e17\u0e23\u0e32\u0e22) \u0e40\u0e1a\u0e2d\u0e23\u0e4c 80 ( Production ) use","c":"Consumables","s":35.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":false,"lw":"2026-05-06"},{"n":"Sandpaper No.360 (\u0e01\u0e23\u0e30\u0e14\u0e32\u0e29\u0e17\u0e23\u0e32\u0e22) \u0e40\u0e1a\u0e2d\u0e23\u0e4c360 ( Production ) use","c":"Consumables","s":45.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":false,"lw":"2026-05-06"},{"n":"Popsicle \u0e44\u0e21\u0e49\u0e44\u0e2d\u0e15\u0e34\u0e21 ( Production ) use","c":"Consumables","s":135.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"S.K.P. RUNGRUEANG LLP.","st":"","stop":false,"lw":"2026-05-08"},{"n":"Electrical Terminals Blue ( Production ) use","c":"Consumables","s":100.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"S.K.P. RUNGRUEANG LLP.","st":"","stop":false,"lw":"2026-05-02"},{"n":"Tape Cassette Laminated 12 mm. Tze.231 (WHITE) ( QC ) use","c":"Consumables","s":5.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"SLP NAVANAKORN LLP.","st":"","stop":false,"lw":"2026-04-02"},{"n":"Tape Cassette Laminated 12 mm. Tze.631 (Yellow) ( QC ) use","c":"Consumables","s":4.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"SLP NAVANAKORN LLP.","st":"","stop":false,"lw":"2026-03-16"},{"n":"Tape Cassette Laminated 12 mm. Tze.731 (Green) ( QC ) use","c":"Consumables","s":4.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"SLP NAVANAKORN LLP.","st":"","stop":false,"lw":"2026-04-23"},{"n":"Label Sticker Size.13x38 mm. ( Wiper Roll ) use","c":"Consumables","s":54.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2026-02-11"},{"n":"Cutter blade L-150 ( Production ) use","c":"Consumables","s":90.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":false,"lw":"2026-05-08"},{"n":"Scotch Magic Tape 810 ( Production ) use","c":"Consumables","s":20.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":false,"lw":"2026-05-04"},{"n":"Scotch Brite \u0e2a\u0e35\u0e41\u0e14\u0e07 ( Production ) use","c":"Consumables","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"","st":"","stop":false,"lw":"2025-01-27"},{"n":"Louis Pena Clean \u0e19\u0e49\u0e33\u0e22\u0e32\u0e02\u0e08\u0e31\u0e14\u0e04\u0e23\u0e32\u0e1a ( Production ) use","c":"Consumables","s":1.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"PATCHARIN POWER CLEAN CO., LTD.","st":"","stop":false,"lw":"2026-05-07"},{"n":"Medical Gloves (\u0e16\u0e38\u0e07\u0e21\u0e37\u0e2d\u0e41\u0e1e\u0e17\u0e22\u0e4c) SIZE.S ( QC ) use","c":"Consumables","s":0.0,"p":null,"a90":null,"dr":0,"ds":"zero","sup":"LAZADA","st":"","stop":false,"lw":"2026-03-20"},{"n":"Aculon Nano Clear ( Production ) use","c":"Consumables","s":220.0,"p":215.0,"a90":null,"dr":null,"ds":"nodata","sup":"NIPPON GOKIN SDN BHD","st":"","stop":false,"lw":"2026-05-10"},{"n":"Face Mask \u0e2b\u0e19\u0e49\u0e32\u0e01\u0e32\u0e01\u0e2d\u0e19\u0e32\u0e21\u0e31\u0e22 ( Production ) use","c":"Consumables","s":9.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":false,"lw":"2026-05-09"},{"n":"Scotch Tape 500 Transparent \u0e40\u0e17\u0e1b\u0e43\u0e2a ( Step ) use","c":"Consumables","s":36.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"","st":"","stop":true,"lw":"2025-12-24"},{"n":"DRY FILM LAMINATION (\u0e2a\u0e35\u0e41\u0e14\u0e07) (Step) use","c":"Consumables","s":19.0,"p":43.11,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2026-05-08"},{"n":"Medical Gloves (\u0e16\u0e38\u0e07\u0e21\u0e37\u0e2d\u0e41\u0e1e\u0e17\u0e22\u0e4c) SIZE.M - Use Mektec ( Production)","c":"Consumables","s":3.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"PROTECTIVE TECHNOLOGY CO., LTD.","st":"","stop":true,"lw":"2026-02-18"},{"n":"Hex Socket Cap Screw M3 Size 10x2.87 mm. ( Production)","c":"Consumables","s":100.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"S.K.P. RUNGRUEANG LLP.","st":"","stop":false,"lw":"2026-04-28"},{"n":"Hex Socket Cap Screw M3 Size 3.8x2.87 mm. ( Production)","c":"Consumables","s":100.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"S.K.P. RUNGRUEANG LLP.","st":"","stop":false,"lw":"2026-05-02"},{"n":"Lock Nut M3 Size 5.38x2.87 mm. ( Production)","c":"Consumables","s":100.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"S.K.P. RUNGRUEANG LLP.","st":"","stop":false,"lw":"2026-03-28"},{"n":"Staninless Steel Blind Rivet No.4-2 Size 3.2x6.4 ( Production)","c":"Consumables","s":200.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"S.K.P. RUNGRUEANG LLP.","st":"","stop":true,"lw":"2026-01-12"},{"n":"Temperature Control Box","c":"Consumables","s":5.0,"p":59.0,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":"2026-02-09"},{"n":"Canon Toner Cartridge 062","c":"Consumables","s":1.0,"p":270.0,"a90":null,"dr":null,"ds":"nodata","sup":"Canon SIngapore","st":"","stop":true,"lw":"2025-05-06"},{"n":"Silver Tape 10 cm ( Production ) use","c":"Consumables","s":0.0,"p":21.25,"a90":null,"dr":0,"ds":"zero","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":"2026-03-24"},{"n":"YELLOW SINGLE TAPE SMS0300002-C","c":"Consumables","s":200.0,"p":6.3,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":""},{"n":"Silicone Adhesive \u0e01\u0e32\u0e27\u0e0b\u0e34\u0e25\u0e34\u0e42\u0e04\u0e19 (\u0e01\u0e25\u0e48\u0e2d\u0e07\u0e41\u0e14\u0e07)","c":"Consumables","s":103.0,"p":1.95,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":"2025-12-13"},{"n":"NON-SLIP RUBBER (300*10*1mm)","c":"Consumables","s":0.0,"p":0.5,"a90":null,"dr":0,"ds":"zero","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":false,"lw":""},{"n":"Brush grinding machine accessories","c":"Consumables","s":4.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":"2026-03-10"},{"n":"Magnet(\u0e41\u0e21\u0e48\u0e40\u0e2b\u0e25\u0e47\u0e01)","c":"Consumables","s":9.0,"p":null,"a90":null,"dr":null,"ds":"nodata","sup":"IST (SHANGHAI) CO., LTD.","st":"","stop":true,"lw":"2026-03-02"}],"alerts":[{"name":"FGM301L-0.100x610x700mm","category":"Metal Foils","type":"Low Stock","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"FGM301L-0.130x610x700mm","category":"Metal Foils","type":"Low Stock","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"FGM301L-0.150x610x700mm","category":"Metal Foils","type":"Zero Stock - Active","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"FGM301L-0.200x610x700mm","category":"Metal Foils","type":"Low Stock","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"FGNL-SUS304H-TA-0.050x610x700mm","category":"Metal Foils","type":"Zero Stock - Active","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"SUS304H-SR2-0.500x610x700mm","category":"Metal Foils","type":"Low Stock","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"MAGNET-0.060x600x800mm","category":"Metal Foils","type":"Zero Stock - Active","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"SUS304H-TA-0.200x600x700mm IST","category":"Metal Foils","type":"Low Stock","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"MAGNET-0.200x610x800mm","category":"Metal Foils","type":"Low Stock","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"MX-SUS304H-TA-0.300x600x700mm","category":"Metal Foils","type":"Zero Stock - Active","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"NICKEL-0.100x550x610mm","category":"Metal Foils","type":"Zero Stock - Active","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"SUS304H-TA-0.120x600x700mm IST","category":"Metal Foils","type":"Zero Stock - Active","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"FGM304-0.100x600x700mm IST","category":"Metal Foils","type":"Zero Stock - Active","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"FGM304-0.150x600x700mm IST","category":"Metal Foils","type":"Zero Stock - Active","last_alerted":"20 Apr 2026","snooze_until":"27 Apr 2026"},{"name":"FGM304-0.150x600x700mm IST","category":"Metal Foils","type":"Zero Stock - Active","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"SUS304H-0.050x610x830mm Bon Mark","category":"Metal Foils","type":"Zero Stock - Active","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"FGM301L-0.150x610x500mm","category":"Metal Foils","type":"Zero Stock - Active","last_alerted":"07 May 2026","snooze_until":"14 May 2026"},{"name":"SUS304H-SR2-0.100x610x700mm","category":"Metal Foils","type":"Low Stock","last_alerted":"08 May 2026","snooze_until":"15 May 2026"},{"name":"FGM301L-0.180x610x700mm","category":"Metal Foils","type":"Low Stock","last_alerted":"09 May 2026","snooze_until":"16 May 2026"},{"name":"FGM301L-0.090x610x700mm","category":"Metal Foils","type":"Zero Stock - Active","last_alerted":"09 May 2026","snooze_until":"16 May 2026"},{"name":"SUS304H-SR2-0.120x610x700mm","category":"Metal Foils","type":"Zero Stock - Active","last_alerted":"05 May 2026","snooze_until":"12 May 2026"},{"name":"MAGNET-0.500x610x700mm","category":"Metal Foils","type":"Zero Stock - Active","last_alerted":"09 May 2026","snooze_until":"16 May 2026"},{"name":"FGM301L-0.080x610x500mm","category":"Metal Foils","type":"Low Stock","last_alerted":"07 May 2026","snooze_until":"14 May 2026"},{"name":"MAGNET-0.100x610x800mm","category":"Metal Foils","type":"Zero Stock - Active","last_alerted":"08 May 2026","snooze_until":"15 May 2026"},{"name":"Al-Frame-600x550mm(30x40x2.5mm)","category":"Frames","type":"Zero Stock - Active","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"Al-Frame-23x23inch(25x40x2.0mm)","category":"Frames","type":"Zero Stock - Active","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"Al-Frame-650x550mm(30x40x2.5mm)","category":"Frames","type":"Low Stock","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"Al-Frame-29x29inch(40x40x2.5mm)","category":"Frames","type":"Low Stock","last_alerted":"08 May 2026","snooze_until":"15 May 2026"},{"name":"Al-Frame-650x550mm(30x40x3.0mm) Pioneer","category":"Frames","type":"Low Stock","last_alerted":"08 May 2026","snooze_until":"15 May 2026"},{"name":"Al-Frame-736x736mm(30x40x2.5mm) - Inventec","category":"Frames","type":"Low Stock","last_alerted":"09 May 2026","snooze_until":"16 May 2026"},{"name":"Al-Frame-650x550mm(30x40x2.5mm) Old frame Reused","category":"Frames","type":"Low Stock","last_alerted":"08 May 2026","snooze_until":"15 May 2026"},{"name":"Al-Frame-23x23inch(25x40x2.0mm) Old frame Reused","category":"Frames","type":"Low Stock","last_alerted":"08 May 2026","snooze_until":"15 May 2026"},{"name":"Al-Frame-600x550mm(30x40x2.5mm) Old frame Reused","category":"Frames","type":"Approaching Reorder","last_alerted":"08 May 2026","snooze_until":"15 May 2026"},{"name":"Al-Frame-650x650mm(30x40x2.5mm)","category":"Frames","type":"Low Stock","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"Ferric Chloride 40% ( Step ) use","category":"Consumables","type":"Low Stock","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"Masking Tape 1\" 40 yards Inter Tape ( Production ) use","category":"Consumables","type":"Low Stock","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"Masking Tape 1 1/2\" 40 yards Inter Tape ( Production ) use","category":"Consumables","type":"Low Stock","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"Stretch Film ( Production ) use","category":"Consumables","type":"Low Stock","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"Aculon Nano Clear ( Production ) use","category":"Consumables","type":"Low Stock","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"Transparent Packaging Tape OPP 2\" ( Production ) use","category":"Consumables","type":"Low Stock","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"Medical Gloves (\u0e16\u0e38\u0e07\u0e21\u0e37\u0e2d\u0e41\u0e1e\u0e17\u0e22\u0e4c) SIZE.S ( QC ) use","category":"Consumables","type":"Zero Stock - Active","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"Silver Tape 10 cm ( Production ) use","category":"Consumables","type":"Zero Stock - Active","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"Silver Tape 7 cm ( Production ) use","category":"Consumables","type":"Zero Stock - Active","last_alerted":"07 May 2026","snooze_until":"14 May 2026"},{"name":"Hex Socket Cap Screw M3 Size 10x2.87 mm. ( Production)","category":"Consumables","type":"Low Stock","last_alerted":"06 May 2026","snooze_until":"13 May 2026"},{"name":"Carton Box 670x50x695mm (Stencil) Production use","category":"Consumables","type":"Approaching Reorder","last_alerted":"06 May 2026","snooze_until":"13 May 2026"},{"name":"Carton Box 755x60x832mm (Stencil) Production use","category":"Consumables","type":"Approaching Reorder","last_alerted":"06 May 2026","snooze_until":"13 May 2026"},{"name":"Chemicrete4 Part-A (White,25Kg) ( Production ) use","category":"Consumables","type":"Low Stock","last_alerted":"09 May 2026","snooze_until":"16 May 2026"},{"name":"Phosphoric Acid 85% ( Production ) use","category":"Consumables","type":"Low Stock","last_alerted":"05 May 2026","snooze_until":"12 May 2026"},{"name":"Nitric Acid 68% ( Production ) use","category":"Consumables","type":"Low Stock","last_alerted":"05 May 2026","snooze_until":"12 May 2026"},{"name":"Paper Plate ( Production ) use","category":"Consumables","type":"Approaching Reorder","last_alerted":"05 May 2026","snooze_until":"12 May 2026"},{"name":"Electrical Terminals Blue ( Production ) use","category":"Consumables","type":"Low Stock","last_alerted":"07 May 2026","snooze_until":"14 May 2026"},{"name":"Louis Pena Clean \u0e19\u0e49\u0e33\u0e22\u0e32\u0e02\u0e08\u0e31\u0e14\u0e04\u0e23\u0e32\u0e1a ( Production ) use","category":"Consumables","type":"Low Stock","last_alerted":"07 May 2026","snooze_until":"14 May 2026"},{"name":"Hex Socket Cap Screw M3 Size 3.8x2.87 mm. ( Production)","category":"Consumables","type":"Low Stock","last_alerted":"07 May 2026","snooze_until":"14 May 2026"},{"name":"Araldite2 Part-B (R-AW139-1,Resin-White) ( Production ) use","category":"Consumables","type":"Low Stock","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"DRY FILM LAMINATION (\u0e2a\u0e35\u0e41\u0e14\u0e07) (Step) use","category":"Consumables","type":"Approaching Reorder","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"Araldite1 Part-A (H-HW5323, Hardener-Black) ( Production ) use","category":"Consumables","type":"Zero Stock - Active","last_alerted":"11 May 2026","snooze_until":"18 May 2026"},{"name":"Emulsion Blue ( Production ) use","category":"Consumables","type":"Zero Stock - Active","last_alerted":"11 May 2026","snooze_until":"18 May 2026"}]};
+const ITEMS=INV.items;
+const ALERTS=INV.alerts;
+const CATS=['Metal Foils','Frames','Wiper Rolls','Consumables'];
+const CAT_COLORS={'Metal Foils':'#85B7EB','Frames':'#5DCAA5','Wiper Rolls':'#FAC775','Consumables':'#ED93B1'};
+
+let FX=32.20, page=0, PER=30, search='', filterCat='', filterStatus='', filterSupplier='';
+let valChart=null;
+
+const fmt=n=>n==null?'—':Math.round(n).toLocaleString('en');
+const fmtUSD=n=>n==null?'—':'$'+n.toFixed(2);
+const fmtTHB=n=>n==null||n===0?'—':'฿'+Math.round(n).toLocaleString('en');
+
+function urgency(ds){
+  return {zero:0,critical:1,low:2,caution:3,ok:4,nodata:5}[ds]??5;
+}
+
+function daysTag(ds, dr){
+  if(ds==='nodata') return '<span class="tag t-grey">No usage data</span>';
+  if(ds==='zero'||dr===0) return '<span class="tag t-red">Zero stock</span>';
+  if(ds==='critical') return `<span class="tag t-red">${dr}d critical</span>`;
+  if(ds==='low') return `<span class="tag t-amber">${dr}d low</span>`;
+  if(ds==='caution') return `<span class="tag t-yellow">${dr}d caution</span>`;
+  return `<span class="tag t-green">${dr}d ok</span>`;
+}
+
+function daysBar(ds, dr){
+  if(ds==='nodata'||ds==='zero') return '';
+  const pct=Math.min((dr||0)/180*100,100);
+  const col=ds==='critical'?'#E24B4A':ds==='low'?'#EF9F27':ds==='caution'?'#EFC15A':'#5DCAA5';
+  return `<div class="days-wrap">${daysTag(ds,dr)}<div class="d-bar"><div class="d-fill" style="width:${pct}%;background:${col}"></div></div></div>`;
+}
+
+function toggleTheme(){
+  const isLight=document.body.classList.toggle('light');
+  document.getElementById('theme-btn').textContent=isLight?'☾ Dark mode':'☀ Light mode';
+  if(valChart){valChart.data.datasets[0].borderColor=isLight?'#fff':'#1a1a1a';valChart.update();}
+}
+
+async function fetchFX(){
+  try{
+    const r=await fetch('https://api.frankfurter.app/latest?from=USD&to=THB');
+    const d=await r.json();
+    if(d.rates?.THB){FX=d.rates.THB;document.getElementById('fx-badge').textContent='฿'+FX.toFixed(2)+'/USD (live)';}
+  }catch{document.getElementById('fx-badge').textContent='฿'+FX.toFixed(2)+'/USD (fallback)';}
+  document.getElementById('updated').textContent='Updated: 11 May 2026';
+  const priced=ITEMS.filter(i=>i.p).length;
+  const missing=ITEMS.filter(i=>!i.p).length;
+  const totVal=ITEMS.filter(i=>i.p).reduce((s,i)=>s+i.s*i.p*FX,0);
+  document.getElementById('m-value').textContent='฿'+fmt(totVal);
+  document.getElementById('m-priced').textContent=priced;
+  document.getElementById('m-missing').textContent=missing+' missing price';
+  renderAll();
+}
+
+function syncUrgButtons(cat){
+  urgCat=cat;
+  document.querySelectorAll('.cat-btn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.cat===cat);
+  });
+  renderUrgency();
+}
+
+function switchView(el){
+  document.querySelectorAll('.sb-item').forEach(e=>e.classList.remove('active'));
+  el.classList.add('active');
+  const v=el.dataset.view;
+  document.getElementById('view-all').style.display=v==='all'?'block':'none';
+  document.getElementById('view-alerts').style.display=v==='alerts'?'block':'none';
+  if(v!=='all'&&v!=='alerts'){
+    document.getElementById('view-all').style.display='block';
+    document.getElementById('view-alerts').style.display='none';
+    if(v==='stopped'){
+      filterCat='';filterStatus='stopped';
+      document.getElementById('filter-cat').value='';
+      document.getElementById('filter-status').value='stopped';
+      syncUrgButtons('');
+    } else if(v==='noprice'){
+      filterCat='';filterStatus='noprice';
+      document.getElementById('filter-cat').value='';
+      document.getElementById('filter-status').value='noprice';
+      syncUrgButtons('');
+    } else {
+      filterCat=v;filterStatus='';
+      document.getElementById('filter-cat').value=v;
+      document.getElementById('filter-status').value='';
+      syncUrgButtons(v);
+    }
+    page=0;
+    renderHealthBars(filterCat);
+    renderValChart(filterCat);
+    renderTable();
+  } else if(v==='all'){
+    filterCat='';filterStatus='';
+    document.getElementById('filter-cat').value='';
+    document.getElementById('filter-status').value='';
+    page=0;
+    syncUrgButtons('');
+    renderHealthBars('');
+    renderValChart('');
+    renderTable();
+  }
+}
+
+let urgCat='';
+
+function setUrgCat(btn){
+  document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  urgCat=btn.dataset.cat;
+  renderUrgency();
+}
+
+function renderAlertStrip(){
+  const typeColors={
+    'Zero Stock - Active':'pill-red',
+    'Low Stock':'pill-amber',
+    'Approaching Reorder':'pill-amber'
+  };
+  document.getElementById('strip-label').textContent='🔔 '+ALERTS.length+' alerts';
+  document.getElementById('strip-scroll').innerHTML=ALERTS.map(a=>`
+    <div class="alert-pill ${typeColors[a.type]||'pill-amber'}" onclick="jumpToItem('${a.name.replace(/'/g,"\\'")}')">
+      <span class="pill-dot ${a.type==='Zero Stock - Active'?'pd-red':'pd-amber'}"></span>
+      ${a.name.length>35?a.name.slice(0,35)+'…':a.name}
+    </div>`).join('');
+}
+
+function jumpToItem(name){
+  // Set search to item name and scroll to table
+  search=name;
+  document.getElementById('search').value=name;
+  filterCat='';filterStatus='';
+  document.getElementById('filter-cat').value='';
+  document.getElementById('filter-status').value='';
+  page=0;
+  renderTable();
+  document.getElementById('view-all').scrollIntoView({behavior:'smooth',block:'start'});
+  setTimeout(()=>document.querySelector('.table-section')?.scrollIntoView({behavior:'smooth',block:'start'}),300);
+}
+
+function renderUrgency(){
+  let items=ITEMS.filter(i=>i.dr!==null&&i.dr!==undefined);
+  if(urgCat) items=items.filter(i=>i.c===urgCat);
+  // Sort by urgency: zero first, then by days ascending
+  items.sort((a,b)=>{
+    const az=a.dr===0?-1:a.dr, bz=b.dr===0?-1:b.dr;
+    return az-bz;
+  });
+  const top=items.slice(0,10);
+  const maxDays=180;
+  if(!top.length){
+    document.getElementById('urgency-rows').innerHTML='<div style="text-align:center;padding:20px;font-size:12px;color:var(--muted)">No items with usage data for this category</div>';
+    return;
+  }
+  document.getElementById('urgency-rows').innerHTML=top.map(i=>{
+    const pct=i.dr===0?0:Math.min((i.dr/maxDays)*100,100);
+    const col=i.ds==='critical'||i.ds==='zero'?'#E24B4A':i.ds==='low'?'#EF9F27':i.ds==='caution'?'#EFC15A':'#5DCAA5';
+    const daysTxt=i.dr===0?'Zero':i.dr+'d';
+    const dayCol=i.ds==='critical'||i.ds==='zero'?'#F09595':i.ds==='low'?'#FAC775':i.ds==='caution'?'#EFC15A':'#5DCAA5';
+    return `<div class="urgency-row">
+      <span class="u-name" title="${i.n}">${i.n}</span>
+      <div class="u-bar-bg"><div class="u-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+      <span class="u-days" style="color:${dayCol}">${daysTxt}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderAnomalyBanner(){
+  // 1 known anomaly from data exploration
+  const count=1;
+  if(count>0){
+    document.getElementById('anomaly-banner').style.display='flex';
+    document.getElementById('anomaly-text').innerHTML=`<strong>${count} transaction record${count>1?'s':''}</strong> found with a date before 2023 — this may be a data entry error and has been excluded from calculations. Please review the Inventory Log tab in your Google Sheet.`;
+  }
+}
+
+function renderAll(){
+  renderAnomalyBanner();
+  renderUrgency();
+  renderHealthBars('');
+  renderValChart('');
+  renderTable();
+  renderAlerts();
+  populateSuppliers();
+}
+
+function renderHealthBars(catFilter){
+  const activeCats=catFilter?[catFilter]:CATS;
+  const stats={};
+  activeCats.forEach(c=>{
+    const ci=ITEMS.filter(i=>i.c===c);
+    const t=ci.length;
+    stats[c]={
+      crit:ci.filter(i=>i.ds==='zero'||i.ds==='critical').length,
+      low:ci.filter(i=>i.ds==='low').length,
+      cau:ci.filter(i=>i.ds==='caution').length,
+      ok:ci.filter(i=>i.ds==='ok').length,
+      nd:ci.filter(i=>i.ds==='nodata').length,
+      total:t
+    };
+  });
+  document.getElementById('health-bars').innerHTML=activeCats.map(c=>{
+    const s=stats[c],t=s.total;
+    const pct=v=>t?Math.round(v/t*100):0;
+    return `<div class="health-item">
+      <span class="h-name">${c}</span>
+      <div class="h-bar">
+        <div class="h-seg" style="width:${pct(s.crit)}%;background:#E24B4A"></div>
+        <div class="h-seg" style="width:${pct(s.low)}%;background:#EF9F27"></div>
+        <div class="h-seg" style="width:${pct(s.cau)}%;background:#EFC15A"></div>
+        <div class="h-seg" style="width:${pct(s.ok)}%;background:#5DCAA5"></div>
+        <div class="h-seg" style="width:${pct(s.nd)}%;background:#2a2a2a"></div>
+      </div>
+      <span class="h-counts">${s.crit} crit · ${s.ok} ok · ${t} total</span>
+    </div>`;
+  }).join('');
+}
+
+function renderValChart(catFilter){
+  const activeCats=catFilter?[catFilter]:CATS;
+  const activeColors=catFilter?[CAT_COLORS[catFilter]]:Object.values(CAT_COLORS);
+  const vals=activeCats.map(c=>Math.round(ITEMS.filter(i=>i.c===c&&i.p).reduce((s,i)=>s+i.s*i.p*FX,0)/1000));
+  document.getElementById('val-legend').innerHTML=activeCats.map((c,i)=>`
+    <div class="val-row">
+      <span class="val-name"><span class="val-dot" style="background:${activeColors[i]}"></span>${c}</span>
+      <span class="val-amt">฿${vals[i].toLocaleString()}k</span>
+    </div>`).join('');
+  if(valChart)valChart.destroy();
+  valChart=new Chart(document.getElementById('val-chart'),{
+    type:'doughnut',
+    data:{labels:activeCats,datasets:[{data:vals,backgroundColor:activeColors,borderWidth:1,borderColor:document.body.classList.contains('light')?'#fff':'#1a1a1a'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},cutout:'65%'}
+  });
+}
+
+function getFiltered(){
+  let items=[...ITEMS];
+  if(search) items=items.filter(i=>i.n.toLowerCase().includes(search.toLowerCase()));
+  if(filterCat) items=items.filter(i=>i.c===filterCat);
+  if(filterSupplier) items=items.filter(i=>i.sup===filterSupplier);
+  if(filterStatus==='critical') items=items.filter(i=>i.ds==='critical'||i.ds==='zero');
+  else if(filterStatus==='low') items=items.filter(i=>i.ds==='low');
+  else if(filterStatus==='caution') items=items.filter(i=>i.ds==='caution');
+  else if(filterStatus==='ok') items=items.filter(i=>i.ds==='ok');
+  else if(filterStatus==='stopped') items=items.filter(i=>i.stop&&i.s>0);
+  else if(filterStatus==='noprice') items=items.filter(i=>!i.p);
+  items.sort((a,b)=>urgency(a.ds)-urgency(b.ds));
+  return items;
+}
+
+function renderTable(){
+  const items=getFiltered();
+  const start=page*PER;
+  const pg=items.slice(start,start+PER);
+  document.getElementById('tbl-body').innerHTML=pg.map(i=>{
+    const val=i.p&&i.s?fmtTHB(i.s*i.p*FX):'—';
+    const flags=[];
+    if(i.stop&&i.s>0) flags.push('<span class="tag t-amber">Stopped</span>');
+    if(!i.p) flags.push('<span class="tag t-purple">No price</span>');
+    return `<tr ${i.stop&&i.s>0?'class="stopped-row"':''}>
+      <td style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${i.n}">${i.n}</td>
+      <td><span class="tag t-grey">${i.c}</span></td>
+      <td>${fmt(i.s)}</td>
+      <td>${i.ds==='zero'&&i.s===0?'<span class="tag t-red">Zero stock</span>':daysBar(i.ds,i.dr)}</td>
+      <td>${i.a90||'—'}</td>
+      <td>${fmtUSD(i.p)}</td>
+      <td>${val}</td>
+      <td style="font-size:11px;color:#666;max-width:100px;overflow:hidden;text-overflow:ellipsis">${i.sup||'—'}</td>
+      <td>${flags.join(' ')}</td>
+    </tr>`;
+  }).join('');
+  const total=items.length, totalPg=Math.ceil(total/PER);
+  document.getElementById('pager').innerHTML=`
+    <span style="flex:1">${total.toLocaleString()} items</span>
+    <button onclick="page=Math.max(0,page-1);renderTable()" ${page===0?'disabled':''}>prev</button>
+    <span>page ${page+1} / ${Math.max(1,totalPg)}</span>
+    <button onclick="page=Math.min(${totalPg-1},page+1);renderTable()" ${page>=totalPg-1?'disabled':''}>next</button>
+  `;
+}
+
+function renderAlerts(){
+  const typeTag={
+    'Zero Stock - Active':'<span class="tag t-red">Zero Stock</span>',
+    'Low Stock':'<span class="tag t-amber">Low Stock</span>',
+    'Approaching Reorder':'<span class="tag t-yellow">Approaching Reorder</span>'
+  };
+  document.getElementById('alert-body').innerHTML=ALERTS.map(a=>`<tr>
+    <td>${a.name}</td>
+    <td><span class="tag t-grey">${a.category}</span></td>
+    <td>${typeTag[a.type]||`<span class="tag t-grey">${a.type}</span>`}</td>
+    <td style="color:#666;font-size:11px">${a.last_alerted}</td>
+    <td style="color:#FAC775;font-size:11px">${a.snooze_until}</td>
+  </tr>`).join('');
+}
+
+function populateSuppliers(){
+  const sups=[...new Set(ITEMS.map(i=>i.sup).filter(Boolean))].sort();
+  const sel=document.getElementById('filter-supplier');
+  sups.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o);});
+}
+
+document.getElementById('search').addEventListener('input',e=>{search=e.target.value;page=0;renderTable();});
+document.getElementById('filter-cat').addEventListener('change',e=>{filterCat=e.target.value;page=0;renderTable();});
+document.getElementById('filter-status').addEventListener('change',e=>{filterStatus=e.target.value;page=0;renderTable();});
+document.getElementById('filter-supplier').addEventListener('change',e=>{filterSupplier=e.target.value;page=0;renderTable();});
+
+fetchFX();
+</script>
+</body>
+</html>
