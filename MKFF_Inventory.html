@@ -406,11 +406,10 @@ function toggleTheme(){
 
 async function fetchFX(){
   try{
-    const r=await fetch('https://api.frankfurter.app/latest?from=USD&to=THB');
+    const r=await fetch('/.netlify/functions/sheets?type=fx');
     const d=await r.json();
     if(d.rates?.THB){FX=d.rates.THB;document.getElementById('fx-badge').textContent='฿'+FX.toFixed(2)+'/USD (live)';}
   }catch{document.getElementById('fx-badge').textContent='฿'+FX.toFixed(2)+'/USD (fallback)';}
-  // Attempt live Google Sheets fetch
   await fetchFromSheets();
   const priced=ITEMS.filter(i=>i.p).length;
   const missing=ITEMS.filter(i=>!i.p).length;
