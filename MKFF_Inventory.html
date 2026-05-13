@@ -36,6 +36,13 @@ button:hover{background:var(--bg3)}
 .met-val{font-size:24px;font-weight:500;line-height:1.1}
 .met-sub{font-size:11px;color:var(--faint);margin-top:4px}
 
+/* Skeleton loading */
+@keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
+.skeleton{border-radius:4px;background:linear-gradient(90deg,var(--bg3) 25%,var(--bg4) 50%,var(--bg3) 75%);background-size:400px 100%;animation:shimmer 1.4s infinite}
+.skeleton-text{height:12px;margin:4px 0}
+.skeleton-val{height:28px;width:120px;margin:6px 0}
+.skeleton-sub{height:10px;width:80px}
+
 /* Body layout */
 .body{display:grid;grid-template-columns:210px 1fr;overflow:hidden}
 
@@ -178,22 +185,22 @@ body.light .anomaly-banner{background:#FAEEDA;border-color:#FAC775;color:#633806
 <div class="metrics">
   <div class="met m-green">
     <div class="met-lbl">Total inventory value</div>
-    <div class="met-val" id="m-value">฿—</div>
-    <div class="met-sub"><span id="m-priced">128</span> priced · <span id="m-missing" style="color:#FAC775">183 missing price</span></div>
+    <div class="met-val" id="m-value"><span class="skeleton skeleton-val" id="sk-value"></span></div>
+    <div class="met-sub"><span id="m-priced"><span class="skeleton skeleton-sub" id="sk-priced"></span></span> · <span id="m-missing"><span class="skeleton skeleton-sub" id="sk-missing"></span></span></div>
   </div>
   <div class="met m-red">
     <div class="met-lbl">Critical / zero stock</div>
-    <div class="met-val" style="color:#F09595">108</div>
+    <div class="met-val" style="color:#F09595" id="m-critical"><span class="skeleton skeleton-val"></span></div>
     <div class="met-sub">items need immediate action</div>
   </div>
   <div class="met m-amber">
     <div class="met-lbl">Stopped moving (60d)</div>
-    <div class="met-val" style="color:#FAC775">103</div>
+    <div class="met-val" style="color:#FAC775" id="m-stopped"><span class="skeleton skeleton-val"></span></div>
     <div class="met-sub">items with stock, no withdrawals</div>
   </div>
   <div class="met m-blue">
     <div class="met-lbl">Active alerts</div>
-    <div class="met-val">57</div>
+    <div class="met-val" id="m-alerts"><span class="skeleton skeleton-val"></span></div>
     <div class="met-sub">across all categories</div>
   </div>
 </div>
@@ -405,18 +412,30 @@ function toggleTheme(){
 }
 
 async function fetchFX(){
-  try{
-    const r=await fetch('/.netlify/functions/sheets?type=fx');
-    const d=await r.json();
-    if(d.rates?.THB){FX=d.rates.THB;document.getElementById('fx-badge').textContent='฿'+FX.toFixed(2)+'/USD (live)';}
-  }catch{document.getElementById('fx-badge').textContent='฿'+FX.toFixed(2)+'/USD (fallback)';}
-  await fetchFromSheets();
+  document.getElementById('updated').textContent='Fetching live data...';
+  const [fxResult] = await Promise.allSettled([
+    fetch('/.netlify/functions/sheets?type=fx').then(r=>r.json()),
+    fetchFromSheets()
+  ]);
+  if(fxResult.status==='fulfilled' && fxResult.value?.rates?.THB){
+    FX=fxResult.value.rates.THB;
+    document.getElementById('fx-badge').textContent='฿'+FX.toFixed(2)+'/USD (live)';
+  } else {
+    document.getElementById('fx-badge').textContent='฿'+FX.toFixed(2)+'/USD (fallback)';
+  }
   const priced=ITEMS.filter(i=>i.p).length;
   const missing=ITEMS.filter(i=>!i.p).length;
   const totVal=ITEMS.filter(i=>i.p).reduce((s,i)=>s+i.s*i.p*FX,0);
+  const critical=ITEMS.filter(i=>i.ds==='critical'||i.ds==='zero').length;
+  const stopped=ITEMS.filter(i=>i.stop).length;
+  const alerts=ALERTS.length;
   document.getElementById('m-value').textContent='฿'+fmt(totVal);
-  document.getElementById('m-priced').textContent=priced;
+  document.getElementById('m-priced').textContent=priced+' priced';
+  document.getElementById('m-missing').style.color='#FAC775';
   document.getElementById('m-missing').textContent=missing+' missing price';
+  document.getElementById('m-critical').textContent=critical;
+  document.getElementById('m-stopped').textContent=stopped;
+  document.getElementById('m-alerts').textContent=alerts;
   renderAll();
 }
 
