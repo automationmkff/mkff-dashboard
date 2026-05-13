@@ -607,11 +607,17 @@ function renderUrgency(){
 }
 
 function renderAnomalyBanner(){
-  // 1 known anomaly from data exploration
-  const count=1;
+  const cutoff=new Date('2023-01-01');
+  const count=ITEMS.filter(i=>{
+    if(!i.lw) return false;
+    const d=new Date(i.lw);
+    return d instanceof Date && !isNaN(d) && d<cutoff;
+  }).length;
   if(count>0){
     document.getElementById('anomaly-banner').style.display='flex';
     document.getElementById('anomaly-text').innerHTML=`<strong>${count} transaction record${count>1?'s':''}</strong> found with a date before 2023 — this may be a data entry error and has been excluded from calculations. Please review the Inventory Log tab in your Google Sheet.`;
+  } else {
+    document.getElementById('anomaly-banner').style.display='none';
   }
 }
 
